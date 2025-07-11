@@ -1,7 +1,8 @@
 import { io } from 'socket.io-client';
 
 import { config } from './config.mjs';
-import { setInitialPools, updatePool, getPools, getPool, resetPools } from './poolStore.mjs';
+import { setInitialPools, updatePool, resetPools } from './store/poolStore.mjs';
+import { setInitialCoins, updateCoin, resetCoins } from './store/coinStore.mjs';
 
 export function setupSocket() {
   const socket = io(config.socketUrl, {
@@ -31,12 +32,14 @@ export function setupSocket() {
     errorCount.count += 1;
     if (errorCount.count >= 3) {
       resetPools();
+      resetCoins();
     }
   });
 
   socket.on('disconnect', (reason) => {
     console.log('Disconnected from Socket.IO server:', reason);
     resetPools();
+    resetCoins();
   });
 
   socket.on('reconnect_attempt', (attempt) => {
@@ -50,6 +53,7 @@ export function setupSocket() {
     socket.emit('join_user_room');
     console.log('Rejoined user room');
     resetPools();
+    resetCoins();
   });
 
   socket.on('reconnect_error', (err) => {
@@ -57,6 +61,7 @@ export function setupSocket() {
     errorCount.count += 1;
     if (errorCount.count >= 3) {
       resetPools();
+      resetCoins();
     }
   });
 
@@ -73,11 +78,13 @@ export function setupSocket() {
     }
   });
 
-  socket.on('coins_updated', (data) => {
-    console.log('Coin settings updated:', {
-      coin: data.coin,
-      message: data.message || 'Coin settings updated',
-    });
+  socket.on('coins_updated', ({ coins, isInitial }) => {
+    console.log('Received coins_updated:', { coins, isInitial });
+    if (isInitial) {
+      setInitialCoins(coins);
+    } else {
+      coins.forEach(coin => updateCoin(coin));
+    }
   });
 
   socket.on('volumeUpdate', ({ type, poolId, timestamp, volume }) => {
@@ -175,28 +182,27 @@ export function setupSocket() {
     console.log('Withdrawal expired:', { pendingWithdrawalId, ticker, amount });
   });
 
-  // Simple ping/pong heartbeat
   socket.on('pong', () => {
     console.log('Received pong from server');
   });
+
   const heartbeatInterval = setInterval(() => {
     if (socket.connected) {
       socket.emit('ping');
     }
   }, 30000);
 
-  // Cleanup on socket close
   socket.on('close', () => {
     clearInterval(heartbeatInterval);
     resetPools();
+    resetCoins();
   });
 
-  // Example: Send a chat message (requires 'chat' scope)
   socket.on('connect', () => {
     socket.emit('yard_message', {
       text: 'Hello from RunesX API Key Example Bot!!',
     });
   });
 
-  return { socket, poolStore: { getPools, getPool } };
+  return { socket };
 }

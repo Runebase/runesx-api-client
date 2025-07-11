@@ -1,4 +1,3 @@
-// src/index.mjs
 import { Worker } from 'worker_threads';
 
 import { BigNumber } from 'bignumber.js';
@@ -6,7 +5,8 @@ import { BigNumber } from 'bignumber.js';
 import { setupSocket } from './socket.mjs';
 import { getWallets, postSwap } from './api.mjs';
 import { config } from './config.mjs';
-import { getPools, getPool, poolStore } from './poolStore.mjs';
+import { getPools, getPool, poolStore } from './store/poolStore.mjs';
+import { getCoins, getCoinByTicker, coinStore } from './store/coinStore.mjs';
 
 async function startBot() {
   console.log('Starting RunesX API Key Example...');
@@ -19,14 +19,6 @@ async function startBot() {
 
   // Setup Socket.IO
   const { socket } = setupSocket();
-
-  // Define coins (minimal metadata for xRUNES, RUNES, XLM)
-  const coins = [
-    { ticker: 'xRUNES', projectName: 'xRUNES', dp: 7 },
-    { ticker: 'RUNES', projectName: 'RUNES', dp: 8 },
-    { ticker: 'XLM', projectName: 'Stellar Lumens', dp: 7 },
-  ];
-  console.log('Coins defined:', coins);
 
   // Fetch wallet data
   try {
@@ -74,23 +66,66 @@ async function startBot() {
     });
   };
 
+  // Function to wait for coinStore to be populated
+  const waitForCoins = () => {
+    return new Promise((resolve, reject) => {
+      if (coinStore.isInitialReceived) {
+        const coins = getCoins();
+        console.log('Initial coin data already received:', coins.length, 'coins', coins);
+        resolve(coins);
+        return;
+      }
+
+      const timeout = setTimeout(() => {
+        reject(new Error('Timeout waiting for initial coin data'));
+      }, 30000); // 30-second timeout
+
+      socket.on('coins_updated', ({ isInitial, coins }) => {
+        console.log('Received coins_updated:', { isInitial, coins });
+        if (isInitial) {
+          const coins = getCoins();
+          console.log('Initial coin data received:', coins.length, 'coins', coins);
+          clearTimeout(timeout);
+          resolve(coins);
+        }
+      });
+
+      socket.on('connect_error', (err) => {
+        console.error('Socket connect error:', err.message);
+        clearTimeout(timeout);
+        reject(new Error('Socket connection failed'));
+      });
+
+      socket.on('disconnect', (reason) => {
+        console.error('Socket disconnected:', reason);
+        clearTimeout(timeout);
+        reject(new Error('Socket disconnected before receiving initial coin data'));
+      });
+    });
+  };
+
   // Example: Estimate and execute a swap: 0.1 xRUNES to XLM using a worker
   try {
-    console.log('Waiting for initial pool data...');
-    const pools = await waitForPools();
+    console.log('Waiting for initial pool and coin data...');
+    const [pools, coins] = await Promise.all([waitForPools(), waitForCoins()]);
 
     if (!pools.length) {
       throw new Error('No pools available for swap estimation');
     }
+    if (!coins.length) {
+      throw new Error('No coins available for swap estimation');
+    }
 
-    const inputCoin = coins.find((c) => c.ticker === 'xRUNES');
-    const outputCoin = coins.find((c) => c.ticker === 'XLM');
+    const inputCoin = getCoinByTicker('xRUNES');
+    const outputCoin = getCoinByTicker('XLM');
+    if (!inputCoin || !outputCoin) {
+      throw new Error('Required coins (xRUNES or XLM) not found in coinStore');
+    }
+
     const amountIn = '0.1'; // 0.1 xRUNES
     const maxHops = 6;
     const algorithm = 'dfs'; // Use DFS for exhaustive pathfinding
     const slippageTolerance = '1'; // 1% slippage tolerance
-
-    
 
     // Estimate the swap using a worker
     console.log('Estimating swap from xRUNES to XLM using worker...');
@@ -213,6 +248,23 @@ async function startBot() {
         coinB: pool.coinB || 'Missing',
         liquidityShares: pool.liquidityShares,
         updatedAt: pool.updatedAt,
+      })));
+    }
+  });
+
+  // Example: List all coins when initial data is received
+  socket.on('coins_updated', ({ isInitial }) => {
+    if (isInitial) {
+      const coins = getCoins();
+      console.log('All coins:', coins.map((coin) => ({
+        id: coin.id,
+        ticker: coin.ticker,
+        dp: coin.dp,
+        projectName: coin.projectName,
+        status: coin.status,
+        runesComplianceRequirement: coin.runesComplianceRequirement,
+        CoinChains: coin.CoinChains,
+        updatedAt: coin.updatedAt,
       })));
     }
   });
