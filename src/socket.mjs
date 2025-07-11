@@ -1,7 +1,7 @@
-// src/socket.js
 import { io } from 'socket.io-client';
 
 import { config } from './config.mjs';
+import { setInitialPools, updatePool, getPools, getPool, resetPools } from './poolStore.mjs';
 
 export function setupSocket() {
   const socket = io(config.socketUrl, {
@@ -15,20 +15,28 @@ export function setupSocket() {
     reconnectionDelayMax: 5000,
   });
 
+  const errorCount = { count: 0 }; // Track connection errors
+
   socket.on('connect', () => {
     console.log('Connected to Socket.IO server');
     socket.emit('join_public');
     console.log('Joined public room');
     socket.emit('join_user_room');
     console.log('Joined user room');
+    errorCount.count = 0;
   });
 
   socket.on('connect_error', (err) => {
     console.log('Socket connect error:', err.message);
+    errorCount.count += 1;
+    if (errorCount.count >= 3) {
+      resetPools();
+    }
   });
 
   socket.on('disconnect', (reason) => {
     console.log('Disconnected from Socket.IO server:', reason);
+    resetPools();
   });
 
   socket.on('reconnect_attempt', (attempt) => {
@@ -41,14 +49,28 @@ export function setupSocket() {
     console.log('Rejoined public room');
     socket.emit('join_user_room');
     console.log('Rejoined user room');
+    resetPools();
   });
 
   socket.on('reconnect_error', (err) => {
     console.log('Reconnect error:', err.message);
+    errorCount.count += 1;
+    if (errorCount.count >= 3) {
+      resetPools();
+    }
   });
 
   socket.on('error', (err) => {
     console.log('Socket error:', err.message);
+  });
+
+  socket.on('pools_updated', ({ pools, isInitial }) => {
+    console.log('Received pools_updated:', { pools, isInitial });
+    if (isInitial) {
+      setInitialPools(pools);
+    } else {
+      pools.forEach(pool => updatePool(pool));
+    }
   });
 
   socket.on('coins_updated', (data) => {
@@ -64,10 +86,6 @@ export function setupSocket() {
 
   socket.on('operationUpdate', (operation) => {
     console.log('Operation update:', operation);
-  });
-
-  socket.on('pool_updated', ({ pool }) => {
-    console.log('Pool update:', pool);
   });
 
   socket.on('status_updated', (data) => {
@@ -170,6 +188,7 @@ export function setupSocket() {
   // Cleanup on socket close
   socket.on('close', () => {
     clearInterval(heartbeatInterval);
+    resetPools();
   });
 
   // Example: Send a chat message (requires 'chat' scope)
@@ -179,5 +198,5 @@ export function setupSocket() {
     });
   });
 
-  return socket;
+  return { socket, poolStore: { getPools, getPool } };
 }

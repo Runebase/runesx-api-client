@@ -1,7 +1,8 @@
 # RunesX API Key Example
 
 This repository provides a minimal example for interacting with RunesX API endpoints and Socket.IO using API keys. It demonstrates how to:
-- Authenticate with a RunesX API key to connect to the Socket.IO server and listen for chat messages (`yard_message`).
+- Authenticate with a RunesX API key to connect to the Socket.IO server and listen for events like chat messages (`yard_message`) and pool updates (`pools_updated`).
+- Track the state of liquidity pools using WebSocket `pools_updated` events, with buffering to make sure updates are applied only after initial pool data is received.
 - Use HTTP requests to fetch wallet data via the `/wallets` endpoint (requires `read` scope).
 - Execute a swap via the `/swap` endpoint (requires `swap` scope).
 

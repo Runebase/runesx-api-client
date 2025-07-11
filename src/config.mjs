@@ -1,4 +1,4 @@
-// src/config.js
+// src/config.mjs
 import dotenv from 'dotenv';
 
 dotenv.config();
