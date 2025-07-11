@@ -143,9 +143,9 @@ export function setupSocket() {
     console.log('Withdrawal canceled:', { ticker, amount });
   });
 
-  socket.on('recent_yard_messages', (initialMessages) => {
-    console.log('Recent yard messages:', initialMessages);
-  });
+  // socket.on('recent_yard_messages', (initialMessages) => {
+  //   console.log('Recent yard messages:', initialMessages);
+  // });
 
   socket.on('yard_message', (message) => {
     console.log('New chat message:', {

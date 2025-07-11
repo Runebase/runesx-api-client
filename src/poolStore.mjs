@@ -12,9 +12,9 @@ const setInitialPools = (pools) => {
   pools.forEach(pool => {
     poolStore.pools.set(pool.id, {
       id: pool.id,
-      reserveA: new BigNumber(pool.reserveA),
-      reserveB: new BigNumber(pool.reserveB),
-      totalShares: new BigNumber(pool.totalShares),
+      reserveA: pool.reserveA,
+      reserveB: pool.reserveB,
+      totalShares: pool.totalShares,
       activeLiquidityProviders: pool.activeLiquidityProviders || 0,
       runesCompliant: pool.runesCompliant || false,
       lpFeeRate: pool.lpFeeRate || 30,
@@ -64,10 +64,10 @@ const updatePool = (pool) => {
     });
 
     Object.assign(existingPool, {
-      reserveA: new BigNumber(pool.reserveA),
-      reserveB: new BigNumber(pool.reserveB),
+      reserveA: pool.reserveA,
+      reserveB: pool.reserveB,
       updatedAt: pool.updatedAt,
-      ...(pool.totalShares !== undefined && { totalShares: new BigNumber(pool.totalShares) }),
+      ...(pool.totalShares !== undefined && { totalShares: pool.totalShares }),
       ...(pool.activeLiquidityProviders !== undefined && { activeLiquidityProviders: pool.activeLiquidityProviders }),
       ...(pool.runesCompliant !== undefined && { runesCompliant: pool.runesCompliant }),
       ...(pool.lpFeeRate !== undefined && { lpFeeRate: pool.lpFeeRate }),
@@ -98,9 +98,9 @@ const updatePool = (pool) => {
     console.log(`Adding new pool ${pool.id}:`, pool);
     poolStore.pools.set(pool.id, {
       id: pool.id,
-      reserveA: new BigNumber(pool.reserveA),
-      reserveB: new BigNumber(pool.reserveB),
-      totalShares: new BigNumber(pool.totalShares),
+      reserveA: pool.reserveA,
+      reserveB: pool.reserveB,
+      totalShares: pool.totalShares,
       runesCompliant: pool.runesCompliant || false,
       lpFeeRate: pool.lpFeeRate || 30,
       treasuryFeeRate: pool.treasuryFeeRate || 5,
