@@ -1,6 +1,7 @@
 import { poolStore, getPools } from './store/poolStore.mjs';
 import { coinStore, getCoins } from './store/coinStore.mjs';
 import { walletStore, getWallets } from './store/walletStore.mjs';
+import { userSharesStore, getUserShares } from './store/userSharesStore.mjs';
 
 export function waitForStores(socket) {
   // Function to wait for poolStore to be populated
@@ -117,11 +118,50 @@ export function waitForStores(socket) {
     });
   };
 
+  // Function to wait for userSharesStore to be populated
+  const waitForUserShares = () => {
+    return new Promise((resolve, reject) => {
+      if (userSharesStore.isInitialReceived) {
+        const userShares = getUserShares();
+        console.log('Initial user shares data already received:', userShares.length, 'user shares', userShares);
+        resolve(userShares);
+        return;
+      }
+
+      const timeout = setTimeout(() => {
+        reject(new Error('Timeout waiting for initial user shares data'));
+      }, 30000); // 30-second timeout
+
+      socket.on('user_shares_updated', ({ isInitial, userShares }) => {
+        console.log('Received user_shares_updated:', { isInitial, userShares });
+        if (isInitial) {
+          const userShares = getUserShares();
+          console.log('Initial user shares data received:', userShares.length, 'user shares', userShares);
+          clearTimeout(timeout);
+          resolve(userShares);
+        }
+      });
+
+      socket.on('connect_error', (err) => {
+        console.error('Socket connect error:', err.message);
+        clearTimeout(timeout);
+        reject(new Error('Socket connection failed'));
+      });
+
+      socket.on('disconnect', (reason) => {
+        console.error('Socket disconnected:', reason);
+        clearTimeout(timeout);
+        reject(new Error('Socket disconnected before receiving initial user shares data'));
+      });
+    });
+  };
+
   // Return a promise that resolves when all stores are populated
-  return Promise.all([waitForPools(), waitForCoins(), waitForWallets()])
-    .then(([pools, coins, wallets]) => ({
+  return Promise.all([waitForPools(), waitForCoins(), waitForWallets(), waitForUserShares()])
+    .then(([pools, coins, wallets, userShares]) => ({
       pools,
       coins,
       wallets,
+      userShares,
     }));
 }

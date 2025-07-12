@@ -8,6 +8,7 @@ import { config } from './config.mjs';
 import { getPools, getPool } from './store/poolStore.mjs';
 import { getCoins, getCoinByTicker } from './store/coinStore.mjs';
 import { getWallets, getWalletByTicker } from './store/walletStore.mjs';
+import { getUserShares } from './store/userSharesStore.mjs';
 import { waitForStores } from './waitForStores.mjs';
 
 async function startBot() {
@@ -24,8 +25,8 @@ async function startBot() {
 
   // Example: Estimate and execute a swap: 0.1 xRUNES to XLM using a worker
   try {
-    console.log('Waiting for initial pool, coin, and wallet data...');
-    const { pools, coins, wallets } = await waitForStores(socket);
+    console.log('Waiting for initial pool, coin, wallet, and user shares data...');
+    const { pools, coins, wallets, userShares } = await waitForStores(socket);
 
     if (!pools.length) {
       throw new Error('No pools available for swap estimation');
@@ -35,6 +36,9 @@ async function startBot() {
     }
     if (!wallets.length) {
       throw new Error('No wallets available for swap estimation');
+    }
+    if (!userShares.length) {
+      console.warn('No user shares available; proceeding with swap');
     }
 
     const inputCoin = getCoinByTicker('xRUNES');
@@ -162,9 +166,26 @@ async function startBot() {
     }, 10000); // Check every 10 seconds
   };
 
-  // Start monitoring a specific pool and wallets
+  // Example: Monitor user shares
+  const monitorUserShares = () => {
+    setInterval(() => {
+      const userShares = getUserShares();
+      if (userShares.length > 0) {
+        console.log('Monitoring user shares:', userShares.map(share => ({
+          poolId: share.poolId,
+          shares: share.shares,
+          updatedAt: share.updatedAt,
+        })));
+      } else {
+        console.log('No user shares available or not yet initialized');
+      }
+    }, 10000); // Check every 10 seconds
+  };
+
+  // Start monitoring a specific pool, wallets, and user shares
   monitorPool(1); // Using pool ID 1 from previous logs
   monitorWallets();
+  monitorUserShares();
 
   // Example: List all pools when initial data is received
   socket.on('pools_updated', ({ isInitial }) => {
@@ -217,6 +238,18 @@ async function startBot() {
         available: wallet.available,
         locked: wallet.locked,
         updatedAt: wallet.updatedAt,
+      })));
+    }
+  });
+
+  // Example: List all user shares when initial data is received
+  socket.on('user_shares_updated', ({ isInitial }) => {
+    if (isInitial) {
+      const userShares = getUserShares();
+      console.log('All user shares:', userShares.map((share) => ({
+        poolId: share.poolId,
+        shares: share.shares,
+        updatedAt: share.updatedAt,
       })));
     }
   });

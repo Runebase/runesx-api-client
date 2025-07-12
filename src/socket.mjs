@@ -4,6 +4,7 @@ import { config } from './config.mjs';
 import { setInitialPools, updatePool, resetPools } from './store/poolStore.mjs';
 import { setInitialCoins, updateCoin, resetCoins } from './store/coinStore.mjs';
 import { setInitialWallets, updateWallet, resetWallets } from './store/walletStore.mjs';
+import { setInitialUserShares, updateUserShare, resetUserShares } from './store/userSharesStore.mjs';
 
 export function setupSocket() {
   const socket = io(config.socketUrl, {
@@ -35,6 +36,7 @@ export function setupSocket() {
       resetPools();
       resetCoins();
       resetWallets();
+      resetUserShares();
     }
   });
 
@@ -43,6 +45,7 @@ export function setupSocket() {
     resetPools();
     resetCoins();
     resetWallets();
+    resetUserShares();
   });
 
   socket.on('reconnect_attempt', (attempt) => {
@@ -58,6 +61,7 @@ export function setupSocket() {
     resetPools();
     resetCoins();
     resetWallets();
+    resetUserShares();
   });
 
   socket.on('reconnect_error', (err) => {
@@ -67,6 +71,7 @@ export function setupSocket() {
       resetPools();
       resetCoins();
       resetWallets();
+      resetUserShares();
     }
   });
 
@@ -98,6 +103,15 @@ export function setupSocket() {
       setInitialWallets(wallets);
     } else {
       wallets.forEach(wallet => updateWallet(wallet));
+    }
+  });
+
+  socket.on('user_shares_updated', ({ userShares, isInitial }) => {
+    console.log('Received user_shares_updated:', { userShares, isInitial });
+    if (isInitial) {
+      setInitialUserShares(userShares);
+    } else {
+      userShares.forEach(share => updateUserShare(share));
     }
   });
 
@@ -211,6 +225,7 @@ export function setupSocket() {
     resetPools();
     resetCoins();
     resetWallets();
+    resetUserShares();
   });
 
   socket.on('connect', () => {
