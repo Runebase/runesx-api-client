@@ -1,0 +1,13 @@
+{
+  "eslint.enable": true,
+  "eslint.run": "onSave",
+  "editor.formatOnSave": false,
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit"
+  },
+  "eslint.validate": ["javascript", "javascriptreact", "typescript", "typescriptreact", "module"],
+  "eslint.workingDirectories": [{ "directory": "./", "changeProcessCWD": true }],
+  "eslint.options": {
+    "overrideConfigFile": "eslint.config.mjs"
+  }
+}
