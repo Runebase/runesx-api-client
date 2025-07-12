@@ -22,8 +22,8 @@ export function setupSocket() {
     console.log('Connected to Socket.IO server');
     socket.emit('join_public');
     console.log('Joined public room');
-    socket.emit('join_user_room');
-    console.log('Joined user room');
+    socket.emit('join_private');
+    console.log('Joined private room');
     errorCount.count = 0;
   });
 
@@ -50,8 +50,8 @@ export function setupSocket() {
     console.log('Reconnected to Socket.IO server');
     socket.emit('join_public');
     console.log('Rejoined public room');
-    socket.emit('join_user_room');
-    console.log('Rejoined user room');
+    socket.emit('join_private');
+    console.log('Rejoined private room');
     resetPools();
     resetCoins();
   });
