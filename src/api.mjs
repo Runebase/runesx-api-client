@@ -30,3 +30,23 @@ export async function postSwap({ amountIn, path, minAmountOut }) {
     throw new Error(error.response?.data?.error || 'Failed to execute swap');
   }
 }
+
+// Deposit liquidity (requires 'liquidity' scope)
+export async function depositLiquidity({ coinA, coinB, amountA, amountB }) {
+  try {
+    const response = await api.post('/liquidity/deposit', { coinA, coinB, amountA, amountB });
+    return response.data.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.error || 'Failed to deposit liquidity');
+  }
+}
+
+// Withdraw liquidity (requires 'liquidity' scope)
+export async function withdrawLiquidity({ coinA, coinB, shares }) {
+  try {
+    const response = await api.post('/liquidity/withdraw', { coinA, coinB, shares });
+    return response.data.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.error || 'Failed to withdraw liquidity');
+  }
+}

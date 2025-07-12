@@ -1,3 +1,4 @@
+// src/socket.mjs
 import { io } from 'socket.io-client';
 
 import { config } from './config.mjs';
@@ -121,8 +122,19 @@ export function setupSocket() {
 
   socket.on('operationUpdate', (operation) => {
     console.log('Operation update:', operation);
+    // Assuming operation includes liquidity deposit/withdraw results
+    if (operation.type === 'liquidity_deposit' || operation.type === 'liquidity_withdraw') {
+      console.log(`Liquidity operation ${operation.type} completed:`, {
+        uid: operation.uid,
+        coinA: operation.coinA,
+        coinB: operation.coinB,
+        amountA: operation.amountA,
+        amountB: operation.amountB,
+        shares: operation.shares,
+        status: operation.status,
+      });
+    }
   });
-
   socket.on('status_updated', (data) => {
     console.log('Status update:', data);
   });

@@ -1,15 +1,17 @@
+// src/index.mjs
 import { Worker } from 'worker_threads';
 
 import { BigNumber } from 'bignumber.js';
 
 import { setupSocket } from './socket.mjs';
-import { postSwap } from './api.mjs';
+import { postSwap, depositLiquidity, withdrawLiquidity } from './api.mjs';
 import { config } from './config.mjs';
 import { getPools, getPool } from './store/poolStore.mjs';
 import { getCoins, getCoinByTicker } from './store/coinStore.mjs';
 import { getWallets, getWalletByTicker } from './store/walletStore.mjs';
 import { getUserShares } from './store/userSharesStore.mjs';
 import { waitForStores } from './waitForStores.mjs';
+import { estimateLiquidityFrontend, checkRunesLiquidityFrontend, calculateShareAmounts } from './utils/liquidityUtils.mjs';
 
 async function startBot() {
   console.log('Starting RunesX API Key Example...');
@@ -23,20 +25,21 @@ async function startBot() {
   // Setup Socket.IO
   const { socket } = setupSocket();
 
+  console.log('Waiting for initial pool, coin, wallet, and user shares data...');
+  const { pools, coins, wallets, userShares } = await waitForStores(socket);
+
   // Example: Estimate and execute a swap: 0.1 xRUNES to XLM using a worker
   try {
-    console.log('Waiting for initial pool, coin, wallet, and user shares data...');
-    const { pools, coins, wallets, userShares } = await waitForStores(socket);
-
     if (!pools.length) {
-      throw new Error('No pools available for swap estimation');
+      throw new Error('No pools available');
     }
     if (!coins.length) {
-      throw new Error('No coins available for swap estimation');
+      throw new Error('No coins available');
     }
     if (!wallets.length) {
-      throw new Error('No wallets available for swap estimation');
+      throw new Error('No wallets available');
     }
+
     if (!userShares.length) {
       console.warn('No user shares available; proceeding with swap');
     }
@@ -122,7 +125,126 @@ async function startBot() {
     console.error('Error estimating or executing swap:', error.message);
   }
 
-  // Example: Monitor pool reserves for a specific pool
+  try {
+    // Example: Deposit and Withdraw Liquidity
+    console.log('Starting liquidity example...');
+    const coinA = getCoinByTicker('RUNES');
+    const coinB = getCoinByTicker('XLM');
+    if (!coinA || !coinB) {
+      throw new Error('Required coins (RUNES or XLM) not found in coinStore');
+    }
+
+    // Step 1: Check RUNES compliance
+    const { isCompliant, warnings } = checkRunesLiquidityFrontend(coinA, coinB, pools, coins);
+    if (!isCompliant) {
+      console.error('Cannot deposit liquidity due to RUNES compliance issues:', warnings);
+      return;
+    }
+
+    // Step 2: Estimate liquidity amounts
+    const amountA = '1'; // 1 RUNES
+    let depositParams;
+    try {
+      const estimate = estimateLiquidityFrontend({
+        coinA,
+        coinB,
+        amountA,
+        amountB: null,
+        pools,
+        coins,
+      });
+      console.log('Liquidity estimate:', {
+        amountA: estimate.amountA,
+        amountB: estimate.amountB,
+        coinA: estimate.coinA.ticker,
+        coinB: estimate.coinB.ticker,
+        isPoolEmpty: estimate.isPoolEmpty,
+        flipped: estimate.flipped,
+      });
+
+      // Adjust for flipped pairs
+      depositParams = {
+        coinA: { ticker: estimate.coinA.ticker },
+        coinB: { ticker: estimate.coinB.ticker },
+        amountA: estimate.amountA,
+        amountB: estimate.amountB,
+      };
+    } catch (error) {
+      console.error('Error estimating liquidity:', error.message);
+      return;
+    }
+
+    // Step 3: Validate wallet balances
+    const walletA = getWalletByTicker(coinA.ticker);
+    const walletB = getWalletByTicker(coinB.ticker);
+    if (!walletA || new BigNumber(walletA.available).lt(depositParams.amountA)) {
+      console.error(`Insufficient balance for ${coinA.ticker}: ${walletA?.available || 0} available`);
+      return;
+    }
+    if (!walletB || new BigNumber(walletB.available).lt(depositParams.amountB)) {
+      console.error(`Insufficient balance for ${coinB.ticker}: ${walletB?.available || 0} available`);
+      return;
+    }
+
+    // Step 4: Deposit liquidity
+    console.log(`Depositing liquidity: ${depositParams.amountA} ${depositParams.coinA.ticker} and ${depositParams.amountB} ${depositParams.coinB.ticker}`);
+    try {
+      const depositResult = await depositLiquidity(depositParams);
+      console.log('Liquidity deposited successfully:', {
+        coinA: depositResult.coinA.ticker,
+        coinB: depositResult.coinB.ticker,
+        amountA: depositResult.amountA,
+        amountB: depositResult.amountB,
+        shares: depositResult.shares,
+        uid: depositResult.uid,
+      });
+    } catch (error) {
+      console.error('Error depositing liquidity:', error.message);
+      return;
+    }
+
+    // Step 5: Wait for user shares update (simulated delay for WebSocket update)
+    console.log('Waiting 5 seconds for user shares to update...');
+    await new Promise(resolve => setTimeout(resolve, 5000));
+
+    // Step 6: Calculate share amounts and withdraw
+    const updatedUserShares = getUserShares();
+    const calculatedShares = calculateShareAmounts({ userShares: updatedUserShares, pools });
+    const share = calculatedShares.find(
+      s => s.coinA.ticker === depositParams.coinA.ticker && s.coinB.ticker === depositParams.coinB.ticker
+    );
+
+    if (!share) {
+      console.error('No shares found for the deposited pool');
+      return;
+    }
+
+    const sharesToWithdraw = new BigNumber(share.shares).div(2).integerValue(BigNumber.ROUND_DOWN).toString(); // Withdraw 50%
+    console.log(`Withdrawing 50% of shares (${sharesToWithdraw}) from pool ${share.poolId}`);
+
+    try {
+      const withdrawResult = await withdrawLiquidity({
+        coinA: { ticker: share.coinA.ticker },
+        coinB: { ticker: share.coinB.ticker },
+        shares: sharesToWithdraw,
+      });
+      console.log('Liquidity withdrawn successfully:', {
+        coinA: withdrawResult.coinA.ticker,
+        coinB: withdrawResult.coinB.ticker,
+        amountA: withdrawResult.amountA,
+        amountB: withdrawResult.amountB,
+        shares: withdrawResult.shares,
+        uid: withdrawResult.uid,
+      });
+    } catch (error) {
+      console.error('Error withdrawing liquidity:', error.message);
+      return;
+    }
+  } catch (error) {
+    console.error('Error in bot execution:', error.message);
+  }
+
+  // Existing monitoring functions
   const monitorPool = (poolId) => {
     setInterval(() => {
       const pool = getPool(poolId);
@@ -146,7 +268,7 @@ async function startBot() {
       } else {
         console.log(`Pool ${poolId} not found or not yet initialized`);
       }
-    }, 10000); // Check every 10 seconds
+    }, 10000);
   };
 
   // Example: Monitor wallet balances
@@ -163,7 +285,7 @@ async function startBot() {
       } else {
         console.log('No wallets available or not yet initialized');
       }
-    }, 10000); // Check every 10 seconds
+    }, 10000);
   };
 
   // Example: Monitor user shares
@@ -179,11 +301,11 @@ async function startBot() {
       } else {
         console.log('No user shares available or not yet initialized');
       }
-    }, 10000); // Check every 10 seconds
+    }, 10000);
   };
 
   // Start monitoring a specific pool, wallets, and user shares
-  monitorPool(1); // Using pool ID 1 from previous logs
+  monitorPool(1); // Using pool with ID 1
   monitorWallets();
   monitorUserShares();
 
