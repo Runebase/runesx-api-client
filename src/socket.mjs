@@ -3,6 +3,7 @@ import { io } from 'socket.io-client';
 import { config } from './config.mjs';
 import { setInitialPools, updatePool, resetPools } from './store/poolStore.mjs';
 import { setInitialCoins, updateCoin, resetCoins } from './store/coinStore.mjs';
+import { setInitialWallets, updateWallet, resetWallets } from './store/walletStore.mjs';
 
 export function setupSocket() {
   const socket = io(config.socketUrl, {
@@ -33,6 +34,7 @@ export function setupSocket() {
     if (errorCount.count >= 3) {
       resetPools();
       resetCoins();
+      resetWallets();
     }
   });
 
@@ -40,6 +42,7 @@ export function setupSocket() {
     console.log('Disconnected from Socket.IO server:', reason);
     resetPools();
     resetCoins();
+    resetWallets();
   });
 
   socket.on('reconnect_attempt', (attempt) => {
@@ -54,6 +57,7 @@ export function setupSocket() {
     console.log('Rejoined private room');
     resetPools();
     resetCoins();
+    resetWallets();
   });
 
   socket.on('reconnect_error', (err) => {
@@ -62,6 +66,7 @@ export function setupSocket() {
     if (errorCount.count >= 3) {
       resetPools();
       resetCoins();
+      resetWallets();
     }
   });
 
@@ -84,6 +89,15 @@ export function setupSocket() {
       setInitialCoins(coins);
     } else {
       coins.forEach(coin => updateCoin(coin));
+    }
+  });
+
+  socket.on('wallets_updated', ({ wallets, isInitial }) => {
+    console.log('Received wallets_updated:', { wallets, isInitial });
+    if (isInitial) {
+      setInitialWallets(wallets);
+    } else {
+      wallets.forEach(wallet => updateWallet(wallet));
     }
   });
 
@@ -196,6 +210,7 @@ export function setupSocket() {
     clearInterval(heartbeatInterval);
     resetPools();
     resetCoins();
+    resetWallets();
   });
 
   socket.on('connect', () => {

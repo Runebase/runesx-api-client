@@ -3,10 +3,12 @@ import { Worker } from 'worker_threads';
 import { BigNumber } from 'bignumber.js';
 
 import { setupSocket } from './socket.mjs';
-import { getWallets, postSwap } from './api.mjs';
+import { postSwap } from './api.mjs';
 import { config } from './config.mjs';
-import { getPools, getPool, poolStore } from './store/poolStore.mjs';
-import { getCoins, getCoinByTicker, coinStore } from './store/coinStore.mjs';
+import { getPools, getPool } from './store/poolStore.mjs';
+import { getCoins, getCoinByTicker } from './store/coinStore.mjs';
+import { getWallets, getWalletByTicker } from './store/walletStore.mjs';
+import { waitForStores } from './waitForStores.mjs';
 
 async function startBot() {
   console.log('Starting RunesX API Key Example...');
@@ -20,100 +22,19 @@ async function startBot() {
   // Setup Socket.IO
   const { socket } = setupSocket();
 
-  // Fetch wallet data
-  try {
-    const wallets = await getWallets();
-    console.log('Wallet data:', wallets);
-  } catch (error) {
-    console.error('Error fetching wallets:', error.message);
-  }
-
-  // Function to wait for poolStore to be populated
-  const waitForPools = () => {
-    return new Promise((resolve, reject) => {
-      if (poolStore.isInitialReceived) {
-        const pools = getPools();
-        console.log('Initial pool data already received:', pools.length, 'pools', pools);
-        resolve(pools);
-        return;
-      }
-
-      const timeout = setTimeout(() => {
-        reject(new Error('Timeout waiting for initial pool data'));
-      }, 30000); // 30-second timeout
-
-      socket.on('pools_updated', ({ isInitial, pools }) => {
-        console.log('Received pools_updated:', { isInitial, pools });
-        if (isInitial) {
-          const pools = getPools();
-          console.log('Initial pool data received:', pools.length, 'pools', pools);
-          clearTimeout(timeout);
-          resolve(pools);
-        }
-      });
-
-      socket.on('connect_error', (err) => {
-        console.error('Socket connect error:', err.message);
-        clearTimeout(timeout);
-        reject(new Error('Socket connection failed'));
-      });
-
-      socket.on('disconnect', (reason) => {
-        console.error('Socket disconnected:', reason);
-        clearTimeout(timeout);
-        reject(new Error('Socket disconnected before receiving initial pool data'));
-      });
-    });
-  };
-
-  // Function to wait for coinStore to be populated
-  const waitForCoins = () => {
-    return new Promise((resolve, reject) => {
-      if (coinStore.isInitialReceived) {
-        const coins = getCoins();
-        console.log('Initial coin data already received:', coins.length, 'coins', coins);
-        resolve(coins);
-        return;
-      }
-
-      const timeout = setTimeout(() => {
-        reject(new Error('Timeout waiting for initial coin data'));
-      }, 30000); // 30-second timeout
-
-      socket.on('coins_updated', ({ isInitial, coins }) => {
-        console.log('Received coins_updated:', { isInitial, coins });
-        if (isInitial) {
-          const coins = getCoins();
-          console.log('Initial coin data received:', coins.length, 'coins', coins);
-          clearTimeout(timeout);
-          resolve(coins);
-        }
-      });
-
-      socket.on('connect_error', (err) => {
-        console.error('Socket connect error:', err.message);
-        clearTimeout(timeout);
-        reject(new Error('Socket connection failed'));
-      });
-
-      socket.on('disconnect', (reason) => {
-        console.error('Socket disconnected:', reason);
-        clearTimeout(timeout);
-        reject(new Error('Socket disconnected before receiving initial coin data'));
-      });
-    });
-  };
-
   // Example: Estimate and execute a swap: 0.1 xRUNES to XLM using a worker
   try {
-    console.log('Waiting for initial pool and coin data...');
-    const [pools, coins] = await Promise.all([waitForPools(), waitForCoins()]);
+    console.log('Waiting for initial pool, coin, and wallet data...');
+    const { pools, coins, wallets } = await waitForStores(socket);
 
     if (!pools.length) {
       throw new Error('No pools available for swap estimation');
     }
     if (!coins.length) {
       throw new Error('No coins available for swap estimation');
+    }
+    if (!wallets.length) {
+      throw new Error('No wallets available for swap estimation');
     }
 
     const inputCoin = getCoinByTicker('xRUNES');
@@ -178,9 +99,8 @@ async function startBot() {
     const minAmountOutBN = amountOutBN.times(new BigNumber(1).minus(toleranceBN));
     const minAmountOut = minAmountOutBN.toFixed(outputCoin.dp, BigNumber.ROUND_DOWN);
 
-    const wallets = await getWallets();
-    // Validate sufficient balance
-    const wallet = wallets.data.find((w) => w.ticker === inputCoin.ticker);
+    // Validate sufficient balance using walletStore
+    const wallet = getWalletByTicker(inputCoin.ticker);
     if (!wallet || new BigNumber(wallet.available).lt(amountIn)) {
       throw new Error(`Insufficient balance for ${inputCoin.ticker}: ${wallet?.available || 0} available`);
     }
@@ -225,8 +145,26 @@ async function startBot() {
     }, 10000); // Check every 10 seconds
   };
 
-  // Start monitoring a specific pool
+  // Example: Monitor wallet balances
+  const monitorWallets = () => {
+    setInterval(() => {
+      const wallets = getWallets();
+      if (wallets.length > 0) {
+        console.log('Monitoring wallets:', wallets.map(wallet => ({
+          ticker: wallet.ticker,
+          available: wallet.available,
+          locked: wallet.locked,
+          updatedAt: wallet.updatedAt,
+        })));
+      } else {
+        console.log('No wallets available or not yet initialized');
+      }
+    }, 10000); // Check every 10 seconds
+  };
+
+  // Start monitoring a specific pool and wallets
   monitorPool(1); // Using pool ID 1 from previous logs
+  monitorWallets();
 
   // Example: List all pools when initial data is received
   socket.on('pools_updated', ({ isInitial }) => {
@@ -265,6 +203,20 @@ async function startBot() {
         runesComplianceRequirement: coin.runesComplianceRequirement,
         CoinChains: coin.CoinChains,
         updatedAt: coin.updatedAt,
+      })));
+    }
+  });
+
+  // Example: List all wallets when initial data is received
+  socket.on('wallets_updated', ({ isInitial }) => {
+    if (isInitial) {
+      const wallets = getWallets();
+      console.log('All wallets:', wallets.map((wallet) => ({
+        id: wallet.id,
+        ticker: wallet.ticker,
+        available: wallet.available,
+        locked: wallet.locked,
+        updatedAt: wallet.updatedAt,
       })));
     }
   });
