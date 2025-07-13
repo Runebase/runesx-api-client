@@ -9,7 +9,6 @@ export function waitForStores(socket) {
     return new Promise((resolve, reject) => {
       if (poolStore.isInitialReceived) {
         const pools = getPools();
-        console.log('Initial pool data already received:', pools.length, 'pools', pools);
         resolve(pools);
         return;
       }
@@ -19,10 +18,8 @@ export function waitForStores(socket) {
       }, 30000); // 30-second timeout
 
       socket.on('pools_updated', ({ isInitial, pools }) => {
-        console.log('Received pools_updated:', { isInitial, pools });
         if (isInitial) {
           const pools = getPools();
-          console.log('Initial pool data received:', pools.length, 'pools', pools);
           clearTimeout(timeout);
           resolve(pools);
         }
@@ -47,7 +44,6 @@ export function waitForStores(socket) {
     return new Promise((resolve, reject) => {
       if (coinStore.isInitialReceived) {
         const coins = getCoins();
-        console.log('Initial coin data already received:', coins.length, 'coins', coins);
         resolve(coins);
         return;
       }
@@ -57,10 +53,8 @@ export function waitForStores(socket) {
       }, 30000); // 30-second timeout
 
       socket.on('coins_updated', ({ isInitial, coins }) => {
-        console.log('Received coins_updated:', { isInitial, coins });
         if (isInitial) {
           const coins = getCoins();
-          console.log('Initial coin data received:', coins.length, 'coins', coins);
           clearTimeout(timeout);
           resolve(coins);
         }
@@ -85,7 +79,6 @@ export function waitForStores(socket) {
     return new Promise((resolve, reject) => {
       if (walletStore.isInitialReceived) {
         const wallets = getWallets();
-        console.log('Initial wallet data already received:', wallets.length, 'wallets', wallets);
         resolve(wallets);
         return;
       }
@@ -95,10 +88,8 @@ export function waitForStores(socket) {
       }, 30000); // 30-second timeout
 
       socket.on('wallets_updated', ({ isInitial, wallets }) => {
-        console.log('Received wallets_updated:', { isInitial, wallets });
         if (isInitial) {
           const wallets = getWallets();
-          console.log('Initial wallet data received:', wallets.length, 'wallets', wallets);
           clearTimeout(timeout);
           resolve(wallets);
         }
@@ -123,7 +114,6 @@ export function waitForStores(socket) {
     return new Promise((resolve, reject) => {
       if (userSharesStore.isInitialReceived) {
         const userShares = getUserShares();
-        console.log('Initial user shares data already received:', userShares.length, 'user shares', userShares);
         resolve(userShares);
         return;
       }
@@ -133,10 +123,8 @@ export function waitForStores(socket) {
       }, 30000); // 30-second timeout
 
       socket.on('user_shares_updated', ({ isInitial, userShares }) => {
-        console.log('Received user_shares_updated:', { isInitial, userShares });
         if (isInitial) {
           const userShares = getUserShares();
-          console.log('Initial user shares data received:', userShares.length, 'user shares', userShares);
           clearTimeout(timeout);
           resolve(userShares);
         }

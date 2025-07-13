@@ -30,7 +30,6 @@ const setInitialUserShares = (userShares) => {
 
 const updateUserShare = (share) => {
   if (!userSharesStore.isInitialReceived) {
-    console.log('Buffering user share update, initial data not yet received:', share);
     userSharesStore.pendingUpdates.push({ userShares: [share] });
     return;
   }
@@ -41,14 +40,8 @@ const updateUserShare = (share) => {
   if (existingShare) {
     const existingUpdatedAt = new Date(existingShare.updatedAt).getTime();
     if (incomingUpdatedAt <= existingUpdatedAt) {
-      console.log(`Skipping stale update for user share in pool ${share.poolId}`);
       return;
     }
-
-    console.log(`Updating user share for pool ${share.poolId}:`, {
-      shares: share.shares,
-      updatedAt: share.updatedAt,
-    });
 
     userSharesStore.userShares.set(share.poolId, {
       poolId: share.poolId,
@@ -56,7 +49,6 @@ const updateUserShare = (share) => {
       updatedAt: share.updatedAt,
     });
   } else if (share.poolId && new BigNumber(share.shares).gt(0)) {
-    console.log(`Adding new user share for pool ${share.poolId}:`, share);
     userSharesStore.userShares.set(share.poolId, {
       poolId: share.poolId,
       shares: new BigNumber(share.shares).toString(),
@@ -67,7 +59,6 @@ const updateUserShare = (share) => {
   }
 
   if (existingShare && new BigNumber(share.shares).isZero()) {
-    console.log(`Removing user share for pool ${share.poolId} with zero shares`);
     userSharesStore.userShares.delete(share.poolId);
   }
 };

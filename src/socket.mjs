@@ -19,11 +19,8 @@ export function setupSocket(config) {
   const errorCount = { count: 0 }; // Track connection errors
 
   socket.on('connect', () => {
-    console.log('Connected to Socket.IO server');
     socket.emit('join_public');
-    console.log('Joined public room');
     socket.emit('join_private');
-    console.log('Joined private room');
     errorCount.count = 0;
   });
 
@@ -51,11 +48,8 @@ export function setupSocket(config) {
   });
 
   socket.on('reconnect', () => {
-    console.log('Reconnected to Socket.IO server');
     socket.emit('join_public');
-    console.log('Rejoined public room');
     socket.emit('join_private');
-    console.log('Rejoined private room');
     resetPools();
     resetCoins();
     resetWallets();
@@ -78,7 +72,7 @@ export function setupSocket(config) {
   });
 
   socket.on('pools_updated', ({ pools, isInitial }) => {
-    console.log('Received pools_updated:', { pools, isInitial });
+    // console.log('Received pools_updated:', { pools, isInitial });
     if (isInitial) {
       setInitialPools(pools);
     } else {
@@ -87,7 +81,7 @@ export function setupSocket(config) {
   });
 
   socket.on('coins_updated', ({ coins, isInitial }) => {
-    console.log('Received coins_updated:', { coins, isInitial });
+    // console.log('Received coins_updated:', { coins, isInitial });
     if (isInitial) {
       setInitialCoins(coins);
     } else {
@@ -96,7 +90,7 @@ export function setupSocket(config) {
   });
 
   socket.on('wallets_updated', ({ wallets, isInitial }) => {
-    console.log('Received wallets_updated:', { wallets, isInitial });
+    // console.log('Received wallets_updated:', { wallets, isInitial });
     if (isInitial) {
       setInitialWallets(wallets);
     } else {
@@ -105,7 +99,7 @@ export function setupSocket(config) {
   });
 
   socket.on('user_shares_updated', ({ userShares, isInitial }) => {
-    console.log('Received user_shares_updated:', { userShares, isInitial });
+    // console.log('Received user_shares_updated:', { userShares, isInitial });
     if (isInitial) {
       setInitialUserShares(userShares);
     } else {
@@ -114,30 +108,30 @@ export function setupSocket(config) {
   });
 
   socket.on('volumeUpdate', ({ type, poolId, timestamp, volume }) => {
-    console.log('Volume update:', { type, poolId, timestamp, volume });
+    // console.log('Volume update:', { type, poolId, timestamp, volume });
   });
 
   socket.on('operationUpdate', (operation) => {
-    console.log('Operation update:', operation);
+    // console.log('Operation update:', operation);
     // Assuming operation includes liquidity deposit/withdraw results
-    if (operation.type === 'liquidity_deposit' || operation.type === 'liquidity_withdraw') {
-      console.log(`Liquidity operation ${operation.type} completed:`, {
-        uid: operation.uid,
-        coinA: operation.coinA,
-        coinB: operation.coinB,
-        amountA: operation.amountA,
-        amountB: operation.amountB,
-        shares: operation.shares,
-        status: operation.status,
-      });
-    }
+    // if (operation.type === 'liquidity_deposit' || operation.type === 'liquidity_withdraw') {
+    //   console.log(`Liquidity operation ${operation.type} completed:`, {
+    //     uid: operation.uid,
+    //     coinA: operation.coinA,
+    //     coinB: operation.coinB,
+    //     amountA: operation.amountA,
+    //     amountB: operation.amountB,
+    //     shares: operation.shares,
+    //     status: operation.status,
+    //   });
+    // }
   });
   socket.on('status_updated', (data) => {
-    console.log('Status update:', data);
+    // console.log('Status update:', data);
   });
 
   socket.on('deposit_address_generated', ({ requestId, chainId, address, memo }) => {
-    console.log('Deposit address generated:', { requestId, chainId, address, memo });
+    // console.log('Deposit address generated:', { requestId, chainId, address, memo });
   });
 
   socket.on('deposit_processed', (data) => {
@@ -192,31 +186,31 @@ export function setupSocket(config) {
   // });
 
   socket.on('yard_message', (message) => {
-    console.log('New chat message:', {
-      username: message.username,
-      text: message.text,
-      role: message.role,
-      timestamp: new Date(message.timestamp).toLocaleString(),
-    });
+    // console.log('New chat message:', {
+    //   username: message.username,
+    //   text: message.text,
+    //   role: message.role,
+    //   timestamp: new Date(message.timestamp).toLocaleString(),
+    // });
   });
 
   socket.on('message_deleted', ({ messageId }) => {
-    console.log('Message deleted:', { messageId });
+    // console.log('Message deleted:', { messageId });
   });
 
   socket.on('banned', ({ reason, bannedUntil }) => {
-    console.log('Banned from yard:', {
-      reason,
-      bannedUntil: new Date(bannedUntil).toLocaleString(),
-    });
+    // console.log('Banned from yard:', {
+    //   reason,
+    //   bannedUntil: new Date(bannedUntil).toLocaleString(),
+    // });
   });
 
   socket.on('withdrawal_updated', ({ pendingWithdrawalId, expiresAt, stage }) => {
-    console.log('Withdrawal updated:', { pendingWithdrawalId, expiresAt, stage });
+    // console.log('Withdrawal updated:', { pendingWithdrawalId, expiresAt, stage });
   });
 
   socket.on('withdrawal_expired', ({ pendingWithdrawalId, ticker, amount }) => {
-    console.log('Withdrawal expired:', { pendingWithdrawalId, ticker, amount });
+    // console.log('Withdrawal expired:', { pendingWithdrawalId, ticker, amount });
   });
 
   socket.on('pong', () => {
@@ -238,9 +232,9 @@ export function setupSocket(config) {
   });
 
   socket.on('connect', () => {
-    socket.emit('yard_message', {
-      text: 'Hello from RunesX API Key Example Bot!!',
-    });
+    // socket.emit('yard_message', {
+    //   text: 'Hello from RunesX API Key Example Bot!!',
+    // });
   });
 
   return { socket };

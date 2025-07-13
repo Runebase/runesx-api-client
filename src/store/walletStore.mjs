@@ -19,11 +19,9 @@ const setInitialWallets = (wallets) => {
     });
   });
   walletStore.isInitialReceived = true;
-  console.log(`Initialized with ${wallets.length} wallets`);
 
   // Process buffered updates
   if (walletStore.pendingUpdates.length > 0) {
-    console.log(`Processing ${walletStore.pendingUpdates.length} buffered wallet updates`);
     walletStore.pendingUpdates.forEach(({ wallets }) => {
       wallets.forEach(wallet => updateWallet(wallet));
     });
@@ -34,7 +32,6 @@ const setInitialWallets = (wallets) => {
 // Update a single wallet
 const updateWallet = (wallet) => {
   if (!walletStore.isInitialReceived) {
-    console.log('Buffering wallet update, initial data not yet received:', wallet);
     walletStore.pendingUpdates.push({ wallets: [wallet] });
     return;
   }
@@ -45,15 +42,8 @@ const updateWallet = (wallet) => {
   if (existingWallet) {
     const existingUpdatedAt = new Date(existingWallet.updatedAt).getTime();
     if (incomingUpdatedAt <= existingUpdatedAt) {
-      console.log(`Skipping stale update for wallet ${wallet.ticker}`);
       return;
     }
-
-    console.log(`Updating wallet ${wallet.ticker}:`, {
-      available: wallet.available,
-      locked: wallet.locked,
-      updatedAt: wallet.updatedAt,
-    });
 
     walletStore.wallets.set(wallet.ticker, {
       ...existingWallet,
@@ -62,7 +52,6 @@ const updateWallet = (wallet) => {
       updatedAt: wallet.updatedAt,
     });
   } else if (wallet.ticker && new BigNumber(wallet.available).gte(0) && new BigNumber(wallet.locked).gte(0)) {
-    console.log(`Adding new wallet ${wallet.ticker}:`, wallet);
     walletStore.wallets.set(wallet.ticker, {
       id: wallet.id,
       ticker: wallet.ticker,
@@ -90,7 +79,6 @@ const resetWallets = () => {
   walletStore.wallets.clear();
   walletStore.isInitialReceived = false;
   walletStore.pendingUpdates = [];
-  console.log('Reset wallet state due to disconnect or error');
 };
 
 export { walletStore, setInitialWallets, updateWallet, getWallets, getWalletByTicker, resetWallets };

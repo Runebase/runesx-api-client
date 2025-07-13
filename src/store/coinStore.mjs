@@ -22,11 +22,9 @@ const setInitialCoins = (coins) => {
     });
   });
   coinStore.isInitialReceived = true;
-  console.log(`Initialized with ${coins.length} coins`);
 
   // Process buffered updates
   if (coinStore.pendingUpdates.length > 0) {
-    console.log(`Processing ${coinStore.pendingUpdates.length} buffered coin updates`);
     coinStore.pendingUpdates.forEach(({ coins }) => {
       coins.forEach(coin => updateCoin(coin));
     });
@@ -37,7 +35,6 @@ const setInitialCoins = (coins) => {
 // Update a single coin
 const updateCoin = (coin) => {
   if (!coinStore.isInitialReceived) {
-    console.log('Buffering coin update, initial data not yet received:', coin);
     coinStore.pendingUpdates.push({ coins: [coin] });
     return;
   }
@@ -48,18 +45,8 @@ const updateCoin = (coin) => {
   if (existingCoin) {
     const existingUpdatedAt = new Date(existingCoin.updatedAt).getTime();
     if (incomingUpdatedAt <= existingUpdatedAt) {
-      console.log(`Skipping stale update for coin ${coin.id}`);
       return;
     }
-
-    console.log(`Updating coin ${coin.id} (${coin.ticker}):`, {
-      ticker: coin.ticker,
-      dp: coin.dp,
-      projectName: coin.projectName,
-      status: coin.status,
-      runesComplianceRequirement: coin.runesComplianceRequirement,
-      CoinChains: coin.CoinChains,
-    });
 
     Object.assign(existingCoin, {
       ticker: coin.ticker,
@@ -71,7 +58,6 @@ const updateCoin = (coin) => {
       CoinChains: coin.CoinChains || existingCoin.CoinChains,
     });
   } else if (coin.ticker && coin.status && new BigNumber(coin.dp || 0).gte(0)) {
-    console.log(`Adding new coin ${coin.id}:`, coin);
     coinStore.coins.set(coin.id, {
       id: coin.id,
       ticker: coin.ticker,

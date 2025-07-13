@@ -26,11 +26,9 @@ const setInitialPools = (pools) => {
     });
   });
   poolStore.isInitialReceived = true;
-  console.log(`Initialized with ${pools.length} pools`);
 
   // Process buffered updates
   if (poolStore.pendingUpdates.length > 0) {
-    console.log(`Processing ${poolStore.pendingUpdates.length} buffered pool updates`);
     poolStore.pendingUpdates.forEach(({ pools }) => {
       pools.forEach(pool => updatePool(pool));
     });
@@ -41,7 +39,6 @@ const setInitialPools = (pools) => {
 // Update a single pool
 const updatePool = (pool) => {
   if (!poolStore.isInitialReceived) {
-    console.log('Buffering pool update, initial data not yet received:', pool);
     poolStore.pendingUpdates.push({ pools: [pool] });
     return;
   }
@@ -52,16 +49,8 @@ const updatePool = (pool) => {
   if (existingPool) {
     const existingUpdatedAt = new Date(existingPool.updatedAt).getTime();
     if (incomingUpdatedAt <= existingUpdatedAt) {
-      console.log(`Skipping stale update for pool ${pool.id}`);
       return;
     }
-
-    console.log(`Updating pool ${pool.id}:`, {
-      reserveA: pool.reserveA,
-      reserveB: pool.reserveB,
-      totalShares: pool.totalShares,
-      activeLiquidityProviders: pool.activeLiquidityProviders,
-    });
 
     Object.assign(existingPool, {
       reserveA: pool.reserveA,
@@ -91,11 +80,9 @@ const updatePool = (pool) => {
     });
 
     if (new BigNumber(existingPool.totalShares).isZero()) {
-      console.log(`Removing pool ${pool.id} with zero totalShares`);
       poolStore.pools.delete(pool.id);
     }
   } else if (pool.coinA && pool.coinB && new BigNumber(pool.totalShares).gt(0)) {
-    console.log(`Adding new pool ${pool.id}:`, pool);
     poolStore.pools.set(pool.id, {
       id: pool.id,
       reserveA: pool.reserveA,
