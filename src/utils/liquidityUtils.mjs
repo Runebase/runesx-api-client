@@ -1,6 +1,8 @@
 // src/utils/liquidityUtils.mjs
 import { BigNumber } from 'bignumber.js';
 
+import { getRunesPriceUSD, getTokenPriceInRunes } from './swapUtils';
+
 export function normalizeTokenPairFrontend(coinA, coinB, pools) {
   if (!coinA || !coinB || !coinA.ticker || !coinB.ticker) {
     throw new Error('Invalid token objects');
@@ -211,3 +213,42 @@ export function calculateShareAmounts({ userShares, pools }) {
     };
   });
 }
+
+export const getPoolLiquidityUSD = (pool, coins, pools) => {
+  if (!pool || !coins || !pools || !pool.runesCompliant) {
+    return { value: '0', error: 'Pool or coin data missing or not RUNES compliant' };
+  }
+
+  const coinA = coins.find((c) => c.ticker === pool.coinA.ticker);
+  const coinB = coins.find((c) => c.ticker === pool.coinB.ticker);
+  if (!coinA || !coinB) {
+    return { value: '0', error: `Coins not found: ${pool.coinA.ticker}/${pool.coinB.ticker}` };
+  }
+
+  const reserveA = new BigNumber(pool.reserveA).shiftedBy(-pool.coinA.dp);
+  const reserveB = new BigNumber(pool.reserveB).shiftedBy(-pool.coinB.dp);
+
+  if (reserveA.isZero() || reserveB.isZero()) {
+    return { value: '0', error: 'Zero reserves in pool' };
+  }
+
+  const runesPriceUSD = getRunesPriceUSD(pools);
+  const priceAInRunes = new BigNumber(getTokenPriceInRunes(coinA, pools) || '0');
+  const priceBInRunes = new BigNumber(getTokenPriceInRunes(coinB, pools) || '0');
+
+  const valueA = priceAInRunes.times(runesPriceUSD).times(reserveA);
+  const valueB = priceBInRunes.times(runesPriceUSD).times(reserveB);
+
+  if (valueA.isNaN() || valueB.isNaN() || priceAInRunes.isZero() || priceBInRunes.isZero()) {
+    return {
+      value: '0',
+      error: 'Invalid liquidity data (NaN or zero price)',
+    };
+  }
+
+  const poolValue = valueA.plus(valueB);
+  return {
+    value: poolValue.toString(),
+    error: null,
+  };
+};
