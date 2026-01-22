@@ -1,6 +1,6 @@
 {
   "name": "@runesx/api-client",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "A Node.js client for interacting with the RunesX platform API and WebSocket",
   "main": "src/index.mjs",
   "type": "module",
