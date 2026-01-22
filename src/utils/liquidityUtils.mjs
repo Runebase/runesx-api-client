@@ -1,7 +1,7 @@
 // src/utils/liquidityUtils.mjs
 import { BigNumber } from 'bignumber.js';
 
-import { getRunesPriceUSD, getTokenPriceInRunes } from './swapUtils';
+import { getRunesPriceUSD, getTokenPriceInRunes } from './swapUtils.mjs';
 
 export function normalizeTokenPairFrontend(coinA, coinB, pools) {
   if (!coinA || !coinB || !coinA.ticker || !coinB.ticker) {
