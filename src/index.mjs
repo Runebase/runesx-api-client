@@ -9,6 +9,7 @@ import { getUserShares, getUserShareByPoolId } from './store/userSharesStore.mjs
 import { waitForStores } from './waitForStores.mjs';
 import { estimateLiquidityFrontend, checkRunesLiquidityFrontend, calculateShareAmounts } from './utils/liquidityUtils.mjs';
 import { estimateSwap } from './utils/swapUtils.mjs';
+import { createPriceUtils } from './utils/priceUtils.mjs';
 
 export function createRunesXClient(options = {}) {
   const config = createConfig(options);
@@ -70,6 +71,9 @@ export function createRunesXClient(options = {}) {
           console.log(`Pool ${poolId} not found or not yet initialized`);
         }
       }, interval);
+    },
+    utils: {
+      ...createPriceUtils(),
     },
     disconnect: () => {
       if (socket) {
