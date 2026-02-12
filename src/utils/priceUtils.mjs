@@ -39,7 +39,6 @@ export function createPriceUtils() {
   };
 
   const getTokenPriceInRunes = (ticker) => {
-    ensureInitialized();
     if (ticker === 'RUNES') {return '1';}
 
     const pools = getPools();
@@ -64,7 +63,6 @@ export function createPriceUtils() {
   };
 
   const getTokenPriceUSD = (ticker) => {
-    ensureInitialized();
     if (ticker === 'USDC') {return '1';}
 
     const coin = getCoinByTicker(ticker);
