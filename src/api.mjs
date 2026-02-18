@@ -1,5 +1,6 @@
 // src/api.mjs
 import axios from 'axios';
+import { randomUUID } from 'crypto';
 
 export function createApi(config) {
   const api = axios.create({
@@ -19,9 +20,12 @@ export function createApi(config) {
     }
   }
 
-  async function postSwap({ amountIn, path, minAmountOut }) {
+  async function postSwap({ amountIn, path, minAmountOut, idempotencyKey }) {
     try {
-      const response = await api.post('/swap', { amountIn, path, minAmountOut });
+      const key = idempotencyKey || randomUUID();
+      const response = await api.post('/swap', { amountIn, path, minAmountOut }, {
+        headers: { 'X-Idempotency-Key': key },
+      });
       return response.data;
     } catch (error) {
       throw new Error(error.response?.data?.error || 'Failed to execute swap');
