@@ -1,6 +1,7 @@
 // src/api.mjs
-import axios from 'axios';
 import { randomUUID } from 'crypto';
+
+import axios from 'axios';
 
 export function createApi(config) {
   const api = axios.create({
@@ -32,18 +33,26 @@ export function createApi(config) {
     }
   }
 
-  async function depositLiquidity({ coinA, coinB, amountA, amountB }) {
+  async function depositLiquidity({ tickerA, tickerB, amountA, amountB, idempotencyKey }) {
     try {
-      const response = await api.post('/liquidity/deposit', { coinA, coinB, amountA, amountB });
+      const headers = {};
+      if (idempotencyKey) {
+        headers['X-Idempotency-Key'] = idempotencyKey;
+      }
+      const response = await api.post('/liquidity/deposit', { tickerA, tickerB, amountA, amountB }, { headers });
       return response.data.data;
     } catch (error) {
       throw new Error(error.response?.data?.error || 'Failed to deposit liquidity');
     }
   }
 
-  async function withdrawLiquidity({ coinA, coinB, shares }) {
+  async function withdrawLiquidity({ tickerA, tickerB, shares, idempotencyKey }) {
     try {
-      const response = await api.post('/liquidity/withdraw', { coinA, coinB, shares });
+      const headers = {};
+      if (idempotencyKey) {
+        headers['X-Idempotency-Key'] = idempotencyKey;
+      }
+      const response = await api.post('/liquidity/withdraw', { tickerA, tickerB, shares }, { headers });
       return response.data.data;
     } catch (error) {
       throw new Error(error.response?.data?.error || 'Failed to withdraw liquidity');
