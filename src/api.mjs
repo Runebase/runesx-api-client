@@ -35,10 +35,8 @@ export function createApi(config) {
 
   async function depositLiquidity({ tickerA, tickerB, amountA, amountB, minShares, idempotencyKey }) {
     try {
-      const headers = {};
-      if (idempotencyKey) {
-        headers['X-Idempotency-Key'] = idempotencyKey;
-      }
+      const key = idempotencyKey || randomUUID();
+      const headers = { 'X-Idempotency-Key': key };
       const body = { tickerA, tickerB, amountA, amountB };
       if (minShares !== undefined && minShares !== null) {
         body.minShares = minShares;
@@ -50,13 +48,18 @@ export function createApi(config) {
     }
   }
 
-  async function withdrawLiquidity({ tickerA, tickerB, shares, idempotencyKey }) {
+  async function withdrawLiquidity({ tickerA, tickerB, shares, minAmountA, minAmountB, idempotencyKey }) {
     try {
-      const headers = {};
-      if (idempotencyKey) {
-        headers['X-Idempotency-Key'] = idempotencyKey;
+      const key = idempotencyKey || randomUUID();
+      const headers = { 'X-Idempotency-Key': key };
+      const body = { tickerA, tickerB, shares };
+      if (minAmountA !== undefined && minAmountA !== null) {
+        body.minAmountA = minAmountA;
       }
-      const response = await api.post('/liquidity/withdraw', { tickerA, tickerB, shares }, { headers });
+      if (minAmountB !== undefined && minAmountB !== null) {
+        body.minAmountB = minAmountB;
+      }
+      const response = await api.post('/liquidity/withdraw', body, { headers });
       return response.data.data;
     } catch (error) {
       throw new Error(error.response?.data?.error || 'Failed to withdraw liquidity');
