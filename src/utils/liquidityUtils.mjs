@@ -174,6 +174,66 @@ export function estimateLiquidityFrontend({ coinA, coinB, amountA, amountB, pool
   };
 }
 
+/**
+ * Estimate the shares that would be minted for a liquidity deposit.
+ * Uses the same formula as the backend engine.
+ *
+ * @param {Object} params
+ * @param {Object} params.pool - Pool object from getPools() (must include reserveA, reserveB, totalShares, coinA.dp, coinB.dp)
+ * @param {string} params.amountA - Decimal amount of tokenA to deposit
+ * @param {string} params.amountB - Decimal amount of tokenB to deposit
+ * @param {number} [params.slippagePercent=2] - Slippage tolerance percentage (e.g. 2 for 2%)
+ * @returns {{ estimatedShares: string, minShares: string } | null} null if shares cannot be estimated
+ */
+export function estimateDepositShares({ pool, amountA, amountB, slippagePercent = 2 }) {
+  if (!pool || !amountA || !amountB) {
+    return null;
+  }
+
+  const dpA = pool.coinA.dp;
+  const dpB = pool.coinB.dp;
+  const amountABN = new BigNumber(amountA).decimalPlaces(dpA, BigNumber.ROUND_DOWN);
+  const amountBBN = new BigNumber(amountB).decimalPlaces(dpB, BigNumber.ROUND_DOWN);
+
+  if (!amountABN.isFinite() || !amountBBN.isFinite() || amountABN.lte(0) || amountBBN.lte(0)) {
+    return null;
+  }
+
+  const reserveA = new BigNumber(pool.reserveA);
+  const reserveB = new BigNumber(pool.reserveB);
+  const isNewPool = reserveA.isZero() && reserveB.isZero();
+
+  let shares;
+  if (isNewPool) {
+    // New pool: sqrt(amountA * amountB) * 10^9
+    shares = amountABN.times(amountBBN).sqrt().shiftedBy(9).integerValue(BigNumber.ROUND_DOWN);
+  } else {
+    // Existing pool: min((wholeCoinA * totalShares / reserveA), (wholeCoinB * totalShares / reserveB))
+    const totalShares = new BigNumber(pool.totalShares);
+    if (totalShares.isZero() || reserveA.isZero() || reserveB.isZero()) {
+      return null;
+    }
+
+    const wholeCoinA = amountABN.shiftedBy(dpA).integerValue(BigNumber.ROUND_DOWN);
+    const wholeCoinB = amountBBN.shiftedBy(dpB).integerValue(BigNumber.ROUND_DOWN);
+    const sharesFromA = wholeCoinA.times(totalShares).div(reserveA).integerValue(BigNumber.ROUND_DOWN);
+    const sharesFromB = wholeCoinB.times(totalShares).div(reserveB).integerValue(BigNumber.ROUND_DOWN);
+    shares = BigNumber.min(sharesFromA, sharesFromB);
+  }
+
+  if (shares.isZero()) {
+    return null;
+  }
+
+  const slippageMultiplier = new BigNumber(1).minus(new BigNumber(slippagePercent).div(100));
+  const minShares = shares.times(slippageMultiplier).integerValue(BigNumber.ROUND_DOWN).toString();
+
+  return {
+    estimatedShares: shares.toString(),
+    minShares,
+  };
+}
+
 export function calculateShareAmounts({ userShares, pools }) {
   return userShares.map(share => {
     const pool = pools.find(p => p.id === share.poolId);

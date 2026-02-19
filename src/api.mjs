@@ -33,13 +33,17 @@ export function createApi(config) {
     }
   }
 
-  async function depositLiquidity({ tickerA, tickerB, amountA, amountB, idempotencyKey }) {
+  async function depositLiquidity({ tickerA, tickerB, amountA, amountB, minShares, idempotencyKey }) {
     try {
       const headers = {};
       if (idempotencyKey) {
         headers['X-Idempotency-Key'] = idempotencyKey;
       }
-      const response = await api.post('/liquidity/deposit', { tickerA, tickerB, amountA, amountB }, { headers });
+      const body = { tickerA, tickerB, amountA, amountB };
+      if (minShares !== undefined && minShares !== null) {
+        body.minShares = minShares;
+      }
+      const response = await api.post('/liquidity/deposit', body, { headers });
       return response.data.data;
     } catch (error) {
       throw new Error(error.response?.data?.error || 'Failed to deposit liquidity');
@@ -59,5 +63,14 @@ export function createApi(config) {
     }
   }
 
-  return { getWallets, postSwap, depositLiquidity, withdrawLiquidity };
+  async function getPools() {
+    try {
+      const response = await api.get('/pools');
+      return response.data.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.error || 'Failed to fetch pools');
+    }
+  }
+
+  return { getWallets, getPools, postSwap, depositLiquidity, withdrawLiquidity };
 }

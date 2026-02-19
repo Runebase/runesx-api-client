@@ -7,7 +7,7 @@ import { getCoins, getCoinByTicker } from './store/coinStore.mjs';
 import { getWallets as getWalletsStore, getWalletByTicker } from './store/walletStore.mjs';
 import { getUserShares, getUserShareByPoolId } from './store/userSharesStore.mjs';
 import { waitForStores } from './waitForStores.mjs';
-import { estimateLiquidityFrontend, checkRunesLiquidityFrontend, calculateShareAmounts } from './utils/liquidityUtils.mjs';
+import { estimateLiquidityFrontend, checkRunesLiquidityFrontend, calculateShareAmounts, estimateDepositShares } from './utils/liquidityUtils.mjs';
 import { estimateSwap } from './utils/swapUtils.mjs';
 import { createPriceUtils } from './utils/priceUtils.mjs';
 
@@ -54,6 +54,8 @@ export function createRunesXClient(options = {}) {
     estimateSwap: (inputCoin, outputCoin, amountIn, maxHops = 6, algorithm = 'dfs') =>
       estimateSwap(inputCoin, outputCoin, amountIn, getPools(), getCoins(), maxHops, algorithm),
     estimateLiquidityFrontend,
+    estimateDepositShares: ({ pool, amountA, amountB, slippagePercent } = {}) =>
+      estimateDepositShares({ pool, amountA, amountB, slippagePercent }),
     checkRunesLiquidityFrontend: (coinA, coinB) =>
       checkRunesLiquidityFrontend(coinA, coinB, getPools(), getCoins()),
     calculateShareAmounts: () => calculateShareAmounts({ userShares: getUserShares(), pools: getPools() }),
