@@ -10,9 +10,11 @@ export const validatePositiveNumber = (value, fieldName) => {
 };
 
 // Get RUNES price in USD using RUNES/USDC pool
-export const getRunesPriceUSD = async (pools) => {
+export const getRunesPriceUSD = (pools) => {
   try {
-    const runesUsdcPool = pools.find((p) => (p.coinA.ticker === 'RUNES' && p.coinB.ticker === 'USDC'));
+    const runesUsdcPool = pools.find((p) =>
+      (p.coinA.ticker === 'RUNES' && p.coinB.ticker === 'USDC') ||
+      (p.coinA.ticker === 'USDC' && p.coinB.ticker === 'RUNES'));
 
     if (!runesUsdcPool) {
       console.warn('RUNES/USDC pool not found, using fallback price of $0.01');
@@ -63,8 +65,8 @@ export const getTokenPriceInRunes = (token, pools) => {
   const reserveB = new BigNumber(pool.reserveB).shiftedBy(-pool.coinB.dp);
 
   const priceInRunes = isRunesA
-    ? reserveA.div(reserveB).toString() // RUNES/TOKEN: price = reserveB (TOKEN) / reserveA (RUNES)
-    : reserveB.div(reserveA).toString(); // TOKEN/RUNES: price = reserveA (TOKEN) / reserveB (RUNES)
+    ? reserveA.div(reserveB).toString() // RUNES is coinA: price = RUNES_reserve / TOKEN_reserve
+    : reserveB.div(reserveA).toString(); // RUNES is coinB: price = RUNES_reserve / TOKEN_reserve
 
   return priceInRunes;
 };
@@ -74,6 +76,18 @@ const findAllPathsDFS = (startCoin, endCoin, pools, maxHops = 6) => {
   const paths = [];
   const visited = new Set();
 
+  // Build adjacency map for O(1) lookups (matches BFS approach)
+  const poolMap = new Map();
+  pools.forEach((pool) => {
+    if (!pool.runesCompliant || new BigNumber(pool.reserveA).isZero() || new BigNumber(pool.reserveB).isZero()) {return;}
+    const keyA = pool.coinA.ticker;
+    const keyB = pool.coinB.ticker;
+    if (!poolMap.has(keyA)) {poolMap.set(keyA, []);}
+    if (!poolMap.has(keyB)) {poolMap.set(keyB, []);}
+    poolMap.get(keyA).push({ pool, nextCoin: pool.coinB });
+    poolMap.get(keyB).push({ pool, nextCoin: pool.coinA });
+  });
+
   function dfs(currentCoin, currentPath, hops) {
     if (hops > maxHops) {return;}
     if (currentCoin.ticker === endCoin.ticker) {
@@ -81,13 +95,8 @@ const findAllPathsDFS = (startCoin, endCoin, pools, maxHops = 6) => {
       return;
     }
 
-    for (const pool of pools) {
-      if (!pool.runesCompliant) {continue;}
-      const isCoinA = pool.coinA.ticker === currentCoin.ticker;
-      const isCoinB = pool.coinB.ticker === currentCoin.ticker;
-      if (!isCoinA && !isCoinB) {continue;}
-
-      const nextCoin = isCoinA ? pool.coinB : pool.coinA;
+    const connectedPools = poolMap.get(currentCoin.ticker) || [];
+    for (const { pool, nextCoin } of connectedPools) {
       const poolKey = pool.id;
 
       if (visited.has(poolKey)) {continue;}
@@ -175,7 +184,11 @@ export const simulateSwap = (pool, inputCoin, amountInBN, isCoinAInput) => {
   const totalFeeRate = lpFeeRate.plus(treasuryFeeRate);
 
   // Calculate total fee and split proportionally
-  const totalFeeAmount = amountInBN.times(totalFeeRate).integerValue(BigNumber.ROUND_DOWN);
+  let totalFeeAmount = amountInBN.times(totalFeeRate).integerValue(BigNumber.ROUND_DOWN);
+  // Minimum fee floor: match backend - ensure at least 1 smallest unit when fees are configured
+  if (totalFeeRate.gt(0) && totalFeeAmount.isZero()) {
+    totalFeeAmount = new BigNumber(1);
+  }
   let treasuryFeeAmount = new BigNumber(0);
   let lpFeeAmount = new BigNumber(0);
   if (!totalFeeRate.eq(0)) {
@@ -197,7 +210,7 @@ export const simulateSwap = (pool, inputCoin, amountInBN, isCoinAInput) => {
   }
   amountOutBN = amountOutBN.integerValue(BigNumber.ROUND_DOWN);
 
-  if (amountOutBN.isNaN() || amountOutBN.lt(1)) {return null;}
+  if (amountOutBN.isNaN() || !amountOutBN.isFinite() || amountOutBN.lt(1)) {return null;}
 
   // Simulate reserve updates (mimicking backend)
   const updatedPool = { ...pool };
@@ -362,7 +375,7 @@ export const estimateSwap = async (
   const runesPriceUSD = await getRunesPriceUSD(pools);
   const priceAInRunes = getTokenPriceInRunes(inputCoinData, pools);
   const priceBInRunes = getTokenPriceInRunes(outputCoinData, pools);
-  if (!priceAInRunes || !priceBInRunes) {
+  if (!priceAInRunes || priceAInRunes === '0' || !priceBInRunes || priceBInRunes === '0') {
     throw new Error('Pool not initialized or invalid token');
   }
 
@@ -375,48 +388,11 @@ export const estimateSwap = async (
     .times(priceBUSD)
     .toString();
 
-  // Simulate after-swap prices
-  let priceAInRunesAfter = new BigNumber(priceAInRunes);
-  let priceBInRunesAfter = new BigNumber(priceBInRunes);
-  let currentAmount = new BigNumber(amountIn).shiftedBy(inputCoinData.dp || 8);
-  let currentCoin = inputCoinData;
-  let updatedPools = [...pools]; // Clone pools for after-swap price simulation
-
-  for (const step of bestPath) {
-    const poolIndex = updatedPools.findIndex(
-      (p) =>
-        (p.coinA.ticker === step.from && p.coinB.ticker === step.to) ||
-        (p.coinB.ticker === step.from && p.coinA.ticker === step.to)
-    );
-    const pool = updatedPools[poolIndex];
-    const isCoinAInput = pool.coinA.ticker === step.from;
-    const nextCoin = coins.find((c) => c.ticker === step.to);
-    const swapResult = simulateSwap(pool, currentCoin, currentAmount, isCoinAInput);
-
-    const reserveA = new BigNumber(pool.reserveA);
-    const reserveB = new BigNumber(pool.reserveB);
-    if (isCoinAInput) {
-      const newRunesReserve = reserveA.plus(currentAmount);
-      const newTokenReserve = reserveB.minus(swapResult.amountOut);
-      if (step.from === 'RUNES') {
-        priceAInRunesAfter = newRunesReserve.div(newTokenReserve);
-      } else if (step.to === 'RUNES') {
-        priceBInRunesAfter = newRunesReserve.div(newTokenReserve);
-      }
-    } else {
-      const newTokenReserve = reserveB.plus(currentAmount);
-      const newRunesReserve = reserveA.minus(swapResult.amountOut);
-      if (step.from === 'RUNES') {
-        priceAInRunesAfter = newRunesReserve.div(newTokenReserve);
-      } else if (step.to === 'RUNES') {
-        priceBInRunesAfter = newRunesReserve.div(newTokenReserve);
-      }
-    }
-
-    currentAmount = swapResult.amountOut;
-    currentCoin = nextCoin;
-    updatedPools[poolIndex] = swapResult.updatedPool; // Update pool for next iteration
-  }
+  // After-swap prices: use the already-simulated updated pools from bestResult
+  // (estimatePath already tracks post-swap reserve states, no need to re-simulate)
+  const runesPriceUSDAfter = getRunesPriceUSD(bestResult.updatedPools);
+  const priceAInRunesAfter = new BigNumber(getTokenPriceInRunes(inputCoinData, bestResult.updatedPools));
+  const priceBInRunesAfter = new BigNumber(getTokenPriceInRunes(outputCoinData, bestResult.updatedPools));
 
   return {
     input: {
@@ -438,8 +414,8 @@ export const estimateSwap = async (
       intermediateAmounts: bestResult.intermediateAmounts,
     },
     afterSwapPrices: {
-      [inputCoin.ticker]: priceAInRunesAfter.times(runesPriceUSD).toString(),
-      [outputCoin.ticker]: priceBInRunesAfter.times(runesPriceUSD).toString(),
+      [inputCoin.ticker]: priceAInRunesAfter.times(runesPriceUSDAfter).toString(),
+      [outputCoin.ticker]: priceBInRunesAfter.times(runesPriceUSDAfter).toString(),
     },
     path: bestPath,
     algorithm, // Include algorithm in the response
