@@ -4,6 +4,7 @@ import { createApi } from './api.mjs';
 import { createConfig } from './config.mjs';
 import { getPools, getPool } from './store/poolStore.mjs';
 import { getCoins, getCoinByTicker } from './store/coinStore.mjs';
+import { getChains, getChainByName } from './store/chainStore.mjs';
 import { getWallets as getWalletsStore, getWalletByTicker } from './store/walletStore.mjs';
 import { getUserShares, getUserShareByPoolId } from './store/userSharesStore.mjs';
 import { waitForStores } from './waitForStores.mjs';
@@ -22,9 +23,9 @@ export function createRunesXClient(options = {}) {
       throw new Error('API_KEY is required');
     }
     socket = setupSocket(config).socket;
-    const { pools, coins, wallets, userShares } = await waitForStores(socket);
+    const { pools, coins, chains, wallets, userShares } = await waitForStores(socket);
     initialized = true;
-    return { pools, coins, wallets, userShares };
+    return { pools, coins, chains, wallets, userShares };
   }
 
   function ensureInitialized() {
@@ -43,6 +44,8 @@ export function createRunesXClient(options = {}) {
     getPool,
     getCoins,
     getCoinByTicker,
+    getChains,
+    getChainByName,
     getWallets: getWalletsStore,
     getWalletByTicker,
     getUserShares,

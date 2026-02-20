@@ -3,6 +3,7 @@ import { io } from 'socket.io-client';
 
 import { setInitialPools, updatePool, resetPools } from './store/poolStore.mjs';
 import { setInitialCoins, updateCoin, resetCoins } from './store/coinStore.mjs';
+import { setInitialChains, updateChain, resetChains } from './store/chainStore.mjs';
 import { setInitialWallets, updateWallet, resetWallets } from './store/walletStore.mjs';
 import { setInitialUserShares, updateUserShare, resetUserShares } from './store/userSharesStore.mjs';
 
@@ -30,6 +31,7 @@ export function setupSocket(config) {
     if (errorCount.count >= 3) {
       resetPools();
       resetCoins();
+      resetChains();
       resetWallets();
       resetUserShares();
     }
@@ -39,6 +41,7 @@ export function setupSocket(config) {
     console.log('Disconnected from Socket.IO server:', reason);
     resetPools();
     resetCoins();
+    resetChains();
     resetWallets();
     resetUserShares();
   });
@@ -52,6 +55,7 @@ export function setupSocket(config) {
     socket.emit('join_private');
     resetPools();
     resetCoins();
+    resetChains();
     resetWallets();
     resetUserShares();
   });
@@ -62,6 +66,7 @@ export function setupSocket(config) {
     if (errorCount.count >= 3) {
       resetPools();
       resetCoins();
+      resetChains();
       resetWallets();
       resetUserShares();
     }
@@ -86,6 +91,15 @@ export function setupSocket(config) {
       setInitialCoins(coins);
     } else {
       coins.forEach(coin => updateCoin(coin));
+    }
+  });
+
+  socket.on('chains_updated', ({ chains, isInitial }) => {
+    // console.log('Received chains_updated:', { chains, isInitial });
+    if (isInitial) {
+      setInitialChains(chains);
+    } else {
+      chains.forEach(chain => updateChain(chain));
     }
   });
 
@@ -130,8 +144,8 @@ export function setupSocket(config) {
     // console.log('Status update:', data);
   });
 
-  socket.on('deposit_address_generated', ({ requestId, chainId, address, memo }) => {
-    // console.log('Deposit address generated:', { requestId, chainId, address, memo });
+  socket.on('deposit_address_generated', ({ requestId, chainName, address, memo }) => {
+    // console.log('Deposit address generated:', { requestId, chainName, address, memo });
   });
 
   socket.on('deposit_processed', (data) => {
@@ -227,6 +241,7 @@ export function setupSocket(config) {
     clearInterval(heartbeatInterval);
     resetPools();
     resetCoins();
+    resetChains();
     resetWallets();
     resetUserShares();
   });
