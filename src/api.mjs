@@ -12,12 +12,169 @@ export function createApi(config) {
     },
   });
 
+  // ---- Public endpoints (no auth required) ----
+
+  async function getStatus() {
+    try {
+      const response = await api.get('/status');
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.error || 'Failed to fetch status');
+    }
+  }
+
+  async function getCoins() {
+    try {
+      const response = await api.get('/coins');
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.error || 'Failed to fetch coins');
+    }
+  }
+
+  async function getCoin(ticker) {
+    try {
+      const response = await api.get(`/coins/${encodeURIComponent(ticker)}`);
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.error || 'Failed to fetch coin');
+    }
+  }
+
+  async function getPools() {
+    try {
+      const response = await api.get('/pools');
+      return response.data.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.error || 'Failed to fetch pools');
+    }
+  }
+
+  async function getPoolByPair(tickerA, tickerB) {
+    try {
+      const response = await api.get(`/pools/${encodeURIComponent(tickerA)}/${encodeURIComponent(tickerB)}`);
+      return response.data.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.error || 'Failed to fetch pool');
+    }
+  }
+
+  async function getPoolLiquidityShares(poolId) {
+    try {
+      const response = await api.get(`/pools/liquidity-shares/${encodeURIComponent(poolId)}`);
+      return response.data.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.error || 'Failed to fetch pool liquidity shares');
+    }
+  }
+
+  async function getPrices() {
+    try {
+      const response = await api.get('/price');
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.error || 'Failed to fetch prices');
+    }
+  }
+
+  async function getPrice(ticker) {
+    try {
+      const response = await api.get(`/price/${encodeURIComponent(ticker)}`);
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.error || 'Failed to fetch price');
+    }
+  }
+
+  async function getCandlesticks(poolId, timeframe, from, to) {
+    try {
+      const response = await api.get(`/candlesticks/${encodeURIComponent(poolId)}/${encodeURIComponent(timeframe)}/${encodeURIComponent(from)}/${encodeURIComponent(to)}`);
+      return response.data.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.error || 'Failed to fetch candlesticks');
+    }
+  }
+
+  async function getVolumeTotal() {
+    try {
+      const response = await api.get('/volume/total');
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.error || 'Failed to fetch total volume');
+    }
+  }
+
+  async function getVolumePool(poolId) {
+    try {
+      const response = await api.get(`/volume/pool/${encodeURIComponent(poolId)}`);
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.error || 'Failed to fetch pool volume');
+    }
+  }
+
+  async function getBucketsPools() {
+    try {
+      const response = await api.get('/buckets/pools');
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.error || 'Failed to fetch pool buckets');
+    }
+  }
+
+  async function getRecentOperations({ operationType, limit } = {}) {
+    try {
+      const params = {};
+      if (operationType) { params.operationType = operationType; }
+      if (limit) { params.limit = limit; }
+      const response = await api.get('/operations/recent', { params });
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.error || 'Failed to fetch recent operations');
+    }
+  }
+
+  async function getPoolOperations(poolId, { operationType, limit } = {}) {
+    try {
+      const params = {};
+      if (operationType) { params.operationType = operationType; }
+      if (limit) { params.limit = limit; }
+      const response = await api.get(`/operations/pool/${encodeURIComponent(poolId)}`, { params });
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.error || 'Failed to fetch pool operations');
+    }
+  }
+
+  async function getYardMessages({ before, limit } = {}) {
+    try {
+      const params = {};
+      if (before) { params.before = before; }
+      if (limit) { params.limit = limit; }
+      const response = await api.get('/yard/messages', { params });
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.error || 'Failed to fetch yard messages');
+    }
+  }
+
+  // ---- Private endpoints (auth required) ----
+
   async function getWallets() {
     try {
       const response = await api.get('/wallets');
       return response.data;
     } catch (error) {
       throw new Error(error.response?.data?.error || 'Failed to fetch wallets');
+    }
+  }
+
+  async function getLiquidityShares() {
+    try {
+      const response = await api.get('/liquidity/shares');
+      return response.data.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.error || 'Failed to fetch liquidity shares');
     }
   }
 
@@ -66,14 +223,167 @@ export function createApi(config) {
     }
   }
 
-  async function getPools() {
+  async function getDepositAddress(chainName) {
     try {
-      const response = await api.get('/pools');
+      const response = await api.get(`/deposit/address/${encodeURIComponent(chainName)}`);
       return response.data.data;
     } catch (error) {
-      throw new Error(error.response?.data?.error || 'Failed to fetch pools');
+      throw new Error(error.response?.data?.error || 'Failed to get deposit address');
     }
   }
 
-  return { getWallets, getPools, postSwap, depositLiquidity, withdrawLiquidity };
+  async function getAllDepositAddresses() {
+    try {
+      const response = await api.get('/deposit/all-addresses');
+      return response.data.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.error || 'Failed to get deposit addresses');
+    }
+  }
+
+  async function initiateWithdraw({ ticker, chain, address, amount, memo, idempotencyKey }) {
+    try {
+      const key = idempotencyKey || randomUUID();
+      const body = { ticker, chain, address, amount };
+      if (memo !== undefined && memo !== null) {
+        body.memo = memo;
+      }
+      const response = await api.post('/withdraw', body, {
+        headers: { 'x-idempotency-key': key },
+      });
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.error || 'Failed to initiate withdrawal');
+    }
+  }
+
+  async function verifyWithdrawPin({ pendingWithdrawalId, pinCode }) {
+    try {
+      const response = await api.post('/withdraw/verify-pin', { pendingWithdrawalId, pinCode });
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.error || 'Failed to verify withdrawal PIN');
+    }
+  }
+
+  async function sendWithdrawEmailPin({ pendingWithdrawalId }) {
+    try {
+      const response = await api.post('/withdraw/send-email-pin', { pendingWithdrawalId });
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.error || 'Failed to send withdrawal email PIN');
+    }
+  }
+
+  async function verifyWithdrawEmailPin({ pendingWithdrawalId, emailPinCode }) {
+    try {
+      const response = await api.post('/withdraw/verify-email-pin', { pendingWithdrawalId, emailPinCode });
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.error || 'Failed to verify withdrawal email PIN');
+    }
+  }
+
+  async function verifyWithdraw2FA({ pendingWithdrawalId, twoFactorToken }) {
+    try {
+      const response = await api.post('/withdraw/verify-2fa', { pendingWithdrawalId, twoFactorToken });
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.error || 'Failed to verify withdrawal 2FA');
+    }
+  }
+
+  async function getPendingWithdrawals() {
+    try {
+      const response = await api.get('/withdraw/pending');
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.error || 'Failed to fetch pending withdrawals');
+    }
+  }
+
+  async function cancelWithdrawal({ pendingWithdrawalId }) {
+    try {
+      const response = await api.post('/withdraw/cancel', { pendingWithdrawalId });
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.error || 'Failed to cancel withdrawal');
+    }
+  }
+
+  async function getTransactionHistory({ page, limit, type, status } = {}) {
+    try {
+      const params = {};
+      if (page) { params.page = page; }
+      if (limit) { params.limit = limit; }
+      if (type) { params.type = type; }
+      if (status) { params.status = status; }
+      const response = await api.get('/transactions/history', { params });
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.error || 'Failed to fetch transaction history');
+    }
+  }
+
+  async function getUserOperations({ operationType, poolId, startTime, endTime, page, limit } = {}) {
+    try {
+      const params = {};
+      if (operationType) { params.operationType = operationType; }
+      if (poolId) { params.poolId = poolId; }
+      if (startTime) { params.startTime = startTime; }
+      if (endTime) { params.endTime = endTime; }
+      if (page) { params.page = page; }
+      if (limit) { params.limit = limit; }
+      const response = await api.get('/operations/user', { params });
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.error || 'Failed to fetch user operations');
+    }
+  }
+
+  async function deleteYardMessage(messageId) {
+    try {
+      const response = await api.delete(`/yard/messages/${encodeURIComponent(messageId)}`);
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.error || 'Failed to delete yard message');
+    }
+  }
+
+  return {
+    // Public
+    getStatus,
+    getCoins,
+    getCoin,
+    getPools,
+    getPoolByPair,
+    getPoolLiquidityShares,
+    getPrices,
+    getPrice,
+    getCandlesticks,
+    getVolumeTotal,
+    getVolumePool,
+    getBucketsPools,
+    getRecentOperations,
+    getPoolOperations,
+    getYardMessages,
+    // Private
+    getWallets,
+    getLiquidityShares,
+    postSwap,
+    depositLiquidity,
+    withdrawLiquidity,
+    getDepositAddress,
+    getAllDepositAddresses,
+    initiateWithdraw,
+    verifyWithdrawPin,
+    sendWithdrawEmailPin,
+    verifyWithdrawEmailPin,
+    verifyWithdraw2FA,
+    getPendingWithdrawals,
+    cancelWithdrawal,
+    getTransactionHistory,
+    getUserOperations,
+    deleteYardMessage,
+  };
 }

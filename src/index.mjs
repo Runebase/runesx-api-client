@@ -14,7 +14,7 @@ import { createPriceUtils } from './utils/priceUtils.mjs';
 
 export function createRunesXClient(options = {}) {
   const config = createConfig(options);
-  let socket = null;
+  let socketHandler = null;
   let initialized = false;
   const api = createApi(config);
 
@@ -22,8 +22,8 @@ export function createRunesXClient(options = {}) {
     if (!config.apiKey) {
       throw new Error('API_KEY is required');
     }
-    socket = setupSocket(config).socket;
-    const { pools, coins, chains, wallets, userShares } = await waitForStores(socket);
+    socketHandler = setupSocket(config);
+    const { pools, coins, chains, wallets, userShares } = await waitForStores(socketHandler.socket);
     initialized = true;
     return { pools, coins, chains, wallets, userShares };
   }
@@ -36,10 +36,14 @@ export function createRunesXClient(options = {}) {
 
   return {
     initialize,
+
+    // Raw socket access
     getSocket: () => {
       ensureInitialized();
-      return socket;
+      return socketHandler.socket;
     },
+
+    // ---- Store accessors (real-time data from WebSocket) ----
     getPools,
     getPool,
     getCoins,
@@ -50,10 +54,90 @@ export function createRunesXClient(options = {}) {
     getWalletByTicker,
     getUserShares,
     getUserShareByPoolId,
+
+    // ---- Event callbacks ----
+    on: (event, callback) => {
+      ensureInitialized();
+      socketHandler.on(event, callback);
+    },
+    off: (event, callback) => {
+      ensureInitialized();
+      socketHandler.off(event, callback);
+    },
+
+    // ---- Socket emit convenience methods ----
+    joinCandlesticks: (poolId, timeframe) => {
+      ensureInitialized();
+      socketHandler.joinCandlesticks(poolId, timeframe);
+    },
+    leaveCandlesticks: (poolId, timeframe) => {
+      ensureInitialized();
+      socketHandler.leaveCandlesticks(poolId, timeframe);
+    },
+    sendYardMessage: (text) => {
+      ensureInitialized();
+      socketHandler.sendYardMessage(text);
+    },
+    deleteMessage: (messageId) => {
+      ensureInitialized();
+      socketHandler.deleteMessage(messageId);
+    },
+    markYardRead: () => {
+      ensureInitialized();
+      socketHandler.markYardRead();
+    },
+
+    // ---- Trading API (auth required, scope: swap) ----
     postSwap: api.postSwap,
+
+    // ---- Liquidity API (auth required, scope: liquidity_deposit/liquidity_withdraw) ----
     depositLiquidity: api.depositLiquidity,
     withdrawLiquidity: api.withdrawLiquidity,
+    getLiquidityShares: api.getLiquidityShares,
+
+    // ---- Wallet API (auth required, scope: read) ----
     getWalletsApi: api.getWallets,
+
+    // ---- Deposit API (auth required) ----
+    getDepositAddress: api.getDepositAddress,
+    getAllDepositAddresses: api.getAllDepositAddresses,
+
+    // ---- Withdrawal API (auth required, scope: wallet_withdraw) ----
+    initiateWithdraw: api.initiateWithdraw,
+    verifyWithdrawPin: api.verifyWithdrawPin,
+    sendWithdrawEmailPin: api.sendWithdrawEmailPin,
+    verifyWithdrawEmailPin: api.verifyWithdrawEmailPin,
+    verifyWithdraw2FA: api.verifyWithdraw2FA,
+    getPendingWithdrawals: api.getPendingWithdrawals,
+    cancelWithdrawal: api.cancelWithdrawal,
+
+    // ---- Transaction history (auth required, scope: read) ----
+    getTransactionHistory: api.getTransactionHistory,
+
+    // ---- Operations API (public + auth) ----
+    getRecentOperations: api.getRecentOperations,
+    getUserOperations: api.getUserOperations,
+    getPoolOperations: api.getPoolOperations,
+
+    // ---- Public market data API ----
+    getStatus: api.getStatus,
+    getCoinsApi: api.getCoins,
+    getCoinApi: api.getCoin,
+    getPoolsApi: api.getPools,
+    getPoolByPair: api.getPoolByPair,
+    getPoolLiquidityShares: api.getPoolLiquidityShares,
+    getPrices: api.getPrices,
+    getPrice: api.getPrice,
+    getCandlesticks: api.getCandlesticks,
+    getVolumeTotal: api.getVolumeTotal,
+    getVolumePool: api.getVolumePool,
+    getBucketsPools: api.getBucketsPools,
+
+    // ---- Yard (chat) API ----
+    getYardMessages: api.getYardMessages,
+    deleteYardMessage: api.deleteYardMessage,
+
+    // ---- Client-side estimation utilities ----
     estimateSwap: (inputCoin, outputCoin, amountIn, maxHops = 6, algorithm = 'dfs') =>
       estimateSwap(inputCoin, outputCoin, amountIn, getPools(), getCoins(), maxHops, algorithm),
     estimateLiquidityFrontend,
@@ -62,8 +146,15 @@ export function createRunesXClient(options = {}) {
     checkRunesLiquidityFrontend: (coinA, coinB) =>
       checkRunesLiquidityFrontend(coinA, coinB, getPools(), getCoins()),
     calculateShareAmounts: () => calculateShareAmounts({ userShares: getUserShares(), pools: getPools() }),
+
+    // ---- Price utilities ----
+    utils: {
+      ...createPriceUtils(),
+    },
+
+    // ---- Pool monitoring ----
     monitorPool: (poolId, interval = 10000) => {
-      setInterval(() => {
+      return setInterval(() => {
         const pool = getPool(poolId);
         if (pool) {
           console.log(`Monitoring pool ${poolId} (${pool.coinA.ticker}/${pool.coinB.ticker}):`, {
@@ -77,12 +168,11 @@ export function createRunesXClient(options = {}) {
         }
       }, interval);
     },
-    utils: {
-      ...createPriceUtils(),
-    },
+
+    // ---- Disconnect ----
     disconnect: () => {
-      if (socket) {
-        socket.disconnect();
+      if (socketHandler) {
+        socketHandler.socket.disconnect();
       }
     },
   };
