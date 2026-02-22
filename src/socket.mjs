@@ -10,6 +10,7 @@ import { setInitialUserShares, updateUserShare, resetUserShares } from './store/
 export function setupSocket(config) {
   const socket = io(config.socketUrl, {
     auth: { authorization: `Bearer ${config.apiKey}` },
+    extraHeaders: { authorization: `Bearer ${config.apiKey}` },
     transports: ['websocket'],
     reconnection: true,
     reconnectionAttempts: Infinity,
