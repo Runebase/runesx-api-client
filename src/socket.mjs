@@ -6,6 +6,7 @@ import { setInitialCoins, updateCoin, resetCoins } from './store/coinStore.mjs';
 import { setInitialChains, updateChain, resetChains } from './store/chainStore.mjs';
 import { setInitialWallets, updateWallet, resetWallets } from './store/walletStore.mjs';
 import { setInitialUserShares, updateUserShare, resetUserShares } from './store/userSharesStore.mjs';
+import { setInitialOrderBooks, updateOrderBook, resetOrderBooks, setUserOrders, updateUserOrder } from './store/orderbookStore.mjs';
 
 export function setupSocket(config) {
   const socket = io(config.socketUrl, {
@@ -53,6 +54,7 @@ export function setupSocket(config) {
       resetChains();
       resetWallets();
       resetUserShares();
+      resetOrderBooks();
     }
     emit('connect_error', err);
   });
@@ -86,6 +88,7 @@ export function setupSocket(config) {
       resetChains();
       resetWallets();
       resetUserShares();
+      resetOrderBooks();
     }
     emit('reconnect_error', err);
   });
@@ -138,6 +141,32 @@ export function setupSocket(config) {
 
   socket.on('status_updated', (data) => {
     emit('status_updated', data);
+  });
+
+  socket.on('orderbooks_initial', ({ books, isInitial }) => {
+    if (isInitial) {
+      setInitialOrderBooks(books);
+    }
+    emit('orderbooks_initial', { books, isInitial });
+  });
+
+  socket.on('orderbook_updated', ({ pair, bids, asks }) => {
+    updateOrderBook(pair, bids, asks);
+    emit('orderbook_updated', { pair, bids, asks });
+  });
+
+  socket.on('user_orders_initial', (orders) => {
+    setUserOrders(orders);
+    emit('user_orders_initial', orders);
+  });
+
+  socket.on('order_updated', (data) => {
+    updateUserOrder(data);
+    emit('order_updated', data);
+  });
+
+  socket.on('clob_trade', (trade) => {
+    emit('clob_trade', trade);
   });
 
   socket.on('volumeUpdate', (data) => {

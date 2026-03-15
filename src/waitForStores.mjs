@@ -3,6 +3,7 @@ import { coinStore, getCoins } from './store/coinStore.mjs';
 import { chainStore, getChains } from './store/chainStore.mjs';
 import { walletStore, getWallets } from './store/walletStore.mjs';
 import { userSharesStore, getUserShares } from './store/userSharesStore.mjs';
+import { orderbookStore, getAllOrderBooks } from './store/orderbookStore.mjs';
 
 export function waitForStores(socket) {
   // Function to wait for poolStore to be populated
@@ -180,13 +181,47 @@ export function waitForStores(socket) {
     });
   };
 
+  // Function to wait for orderbookStore to be populated
+  const waitForOrderBooks = () => {
+    return new Promise((resolve, reject) => {
+      if (orderbookStore.isInitialReceived) {
+        resolve(getAllOrderBooks());
+        return;
+      }
+
+      const timeout = setTimeout(() => {
+        reject(new Error('Timeout waiting for initial orderbook data'));
+      }, 30000);
+
+      socket.on('orderbooks_initial', ({ isInitial }) => {
+        if (isInitial) {
+          clearTimeout(timeout);
+          resolve(getAllOrderBooks());
+        }
+      });
+
+      socket.on('connect_error', (err) => {
+        console.error('Socket connect error:', err.message);
+        clearTimeout(timeout);
+        reject(new Error('Socket connection failed'));
+      });
+
+      socket.on('disconnect', (reason) => {
+        console.error('Socket disconnected:', reason);
+        clearTimeout(timeout);
+        reject(new Error('Socket disconnected before receiving initial orderbook data'));
+      });
+    });
+  };
+
   // Return a promise that resolves when all stores are populated
-  return Promise.all([waitForPools(), waitForCoins(), waitForChains(), waitForWallets(), waitForUserShares()])
-    .then(([pools, coins, chains, wallets, userShares]) => ({
+  return Promise.all([waitForPools(), waitForCoins(), waitForChains(), waitForWallets(), waitForUserShares(), waitForOrderBooks()])
+    .then(([pools, coins, chains, wallets, userShares, orderbooks]) => ({
       pools,
       coins,
       chains,
       wallets,
       userShares,
+      orderbooks,
     }));
 }

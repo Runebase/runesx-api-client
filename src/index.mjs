@@ -7,6 +7,7 @@ import { getCoins, getCoinByTicker } from './store/coinStore.mjs';
 import { getChains, getChainByName } from './store/chainStore.mjs';
 import { getWallets as getWalletsStore, getWalletByTicker } from './store/walletStore.mjs';
 import { getUserShares, getUserShareByPoolId } from './store/userSharesStore.mjs';
+import { getAllOrderBooks, getOrderBook, getOrderBookPairs, getUserOrders } from './store/orderbookStore.mjs';
 import { waitForStores } from './waitForStores.mjs';
 import { estimateLiquidityFrontend, checkRunesLiquidityFrontend, calculateShareAmounts, estimateDepositShares } from './utils/liquidityUtils.mjs';
 import { estimateSwap } from './utils/swapUtils.mjs';
@@ -23,9 +24,9 @@ export function createRunesXClient(options = {}) {
       throw new Error('API_KEY is required');
     }
     socketHandler = setupSocket(config);
-    const { pools, coins, chains, wallets, userShares } = await waitForStores(socketHandler.socket);
+    const { pools, coins, chains, wallets, userShares, orderbooks } = await waitForStores(socketHandler.socket);
     initialized = true;
-    return { pools, coins, chains, wallets, userShares };
+    return { pools, coins, chains, wallets, userShares, orderbooks };
   }
 
   function ensureInitialized() {
@@ -54,6 +55,10 @@ export function createRunesXClient(options = {}) {
     getWalletByTicker,
     getUserShares,
     getUserShareByPoolId,
+    getAllOrderBooks,
+    getOrderBook,
+    getOrderBookPairs,
+    getUserOrders,
 
     // ---- Event callbacks ----
     on: (event, callback) => {
@@ -139,7 +144,7 @@ export function createRunesXClient(options = {}) {
 
     // ---- Client-side estimation utilities ----
     estimateSwap: (inputCoin, outputCoin, amountIn, maxHops = 6, algorithm = 'dfs') =>
-      estimateSwap(inputCoin, outputCoin, amountIn, getPools(), getCoins(), maxHops, algorithm),
+      estimateSwap(inputCoin, outputCoin, amountIn, getPools(), getCoins(), maxHops, algorithm, getAllOrderBooks(), getUserOrders()),
     estimateLiquidityFrontend,
     estimateDepositShares: ({ pool, amountA, amountB, slippagePercent } = {}) =>
       estimateDepositShares({ pool, amountA, amountB, slippagePercent }),

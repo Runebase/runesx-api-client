@@ -71,22 +71,57 @@ export const getTokenPriceInRunes = (token, pools) => {
   return priceInRunes;
 };
 
-// DFS-based pathfinding
-const findAllPathsDFS = (startCoin, endCoin, pools, maxHops = 6) => {
-  const paths = [];
-  const visited = new Set();
+/**
+ * Build unified adjacency map from pools + orderbooks.
+ * Each edge is keyed by a unique edgeKey (pool ID or "ob:PAIR") to prevent revisiting.
+ */
+const buildAdjacencyMap = (pools, coins, orderbooks) => {
+  const adjMap = new Map();
+  const edgePairs = new Set();
 
-  // Build adjacency map for O(1) lookups (matches BFS approach)
-  const poolMap = new Map();
+  // Add edges from pools
   pools.forEach((pool) => {
     if (!pool.runesCompliant || new BigNumber(pool.reserveA).isZero() || new BigNumber(pool.reserveB).isZero()) {return;}
     const keyA = pool.coinA.ticker;
     const keyB = pool.coinB.ticker;
-    if (!poolMap.has(keyA)) {poolMap.set(keyA, []);}
-    if (!poolMap.has(keyB)) {poolMap.set(keyB, []);}
-    poolMap.get(keyA).push({ pool, nextCoin: pool.coinB });
-    poolMap.get(keyB).push({ pool, nextCoin: pool.coinA });
+    if (!adjMap.has(keyA)) {adjMap.set(keyA, []);}
+    if (!adjMap.has(keyB)) {adjMap.set(keyB, []);}
+    adjMap.get(keyA).push({ edgeKey: pool.id, nextCoin: pool.coinB });
+    adjMap.get(keyB).push({ edgeKey: pool.id, nextCoin: pool.coinA });
+    const sorted = [keyA, keyB].sort();
+    edgePairs.add(`${sorted[0]}-${sorted[1]}`);
   });
+
+  // Add edges from orderbooks (only for pairs not already covered by a pool)
+  if (orderbooks) {
+    for (const pair of Object.keys(orderbooks)) {
+      if (edgePairs.has(pair)) {continue;}
+      const depth = orderbooks[pair];
+      if ((!depth.bids || depth.bids.length === 0) && (!depth.asks || depth.asks.length === 0)) {continue;}
+
+      const parts = pair.split('-');
+      if (parts.length !== 2) {continue;}
+      const coinA = coins.find((c) => c.ticker === parts[0]);
+      const coinB = coins.find((c) => c.ticker === parts[1]);
+      if (!coinA || !coinB) {continue;}
+
+      const edgeKey = `ob:${pair}`;
+      if (!adjMap.has(coinA.ticker)) {adjMap.set(coinA.ticker, []);}
+      if (!adjMap.has(coinB.ticker)) {adjMap.set(coinB.ticker, []);}
+      adjMap.get(coinA.ticker).push({ edgeKey, nextCoin: coinB });
+      adjMap.get(coinB.ticker).push({ edgeKey, nextCoin: coinA });
+      edgePairs.add(pair);
+    }
+  }
+
+  return adjMap;
+};
+
+// DFS-based pathfinding
+const findAllPathsDFS = (startCoin, endCoin, pools, maxHops = 6, coins = [], orderbooks = null) => {
+  const paths = [];
+  const visited = new Set();
+  const adjMap = buildAdjacencyMap(pools, coins, orderbooks);
 
   function dfs(currentCoin, currentPath, hops) {
     if (hops > maxHops) {return;}
@@ -95,12 +130,10 @@ const findAllPathsDFS = (startCoin, endCoin, pools, maxHops = 6) => {
       return;
     }
 
-    const connectedPools = poolMap.get(currentCoin.ticker) || [];
-    for (const { pool, nextCoin } of connectedPools) {
-      const poolKey = pool.id;
-
-      if (visited.has(poolKey)) {continue;}
-      visited.add(poolKey);
+    const edges = adjMap.get(currentCoin.ticker) || [];
+    for (const { edgeKey, nextCoin } of edges) {
+      if (visited.has(edgeKey)) {continue;}
+      visited.add(edgeKey);
 
       currentPath.push({
         from: currentCoin.ticker,
@@ -110,7 +143,7 @@ const findAllPathsDFS = (startCoin, endCoin, pools, maxHops = 6) => {
       dfs(nextCoin, currentPath, hops + 1);
 
       currentPath.pop();
-      visited.delete(poolKey);
+      visited.delete(edgeKey);
     }
   }
 
@@ -119,22 +152,11 @@ const findAllPathsDFS = (startCoin, endCoin, pools, maxHops = 6) => {
 };
 
 // BFS-based pathfinding
-const findAllPathsBFS = (startCoin, endCoin, pools, maxHops = 6, maxPaths = 20) => {
+const findAllPathsBFS = (startCoin, endCoin, pools, maxHops = 6, maxPaths = 20, coins = [], orderbooks = null) => {
   const paths = [];
   const queue = [{ coin: startCoin, path: [], hops: 0 }];
   const visited = new Set();
-
-  // Build pool map for faster lookup
-  const poolMap = new Map();
-  pools.forEach((pool) => {
-    if (!pool.runesCompliant || new BigNumber(pool.reserveA).isZero() || new BigNumber(pool.reserveB).isZero()) {return;}
-    const keyA = pool.coinA.ticker;
-    const keyB = pool.coinB.ticker;
-    if (!poolMap.has(keyA)) {poolMap.set(keyA, []);}
-    if (!poolMap.has(keyB)) {poolMap.set(keyB, []);}
-    poolMap.get(keyA).push({ pool, nextCoin: pool.coinB });
-    poolMap.get(keyB).push({ pool, nextCoin: pool.coinA });
-  });
+  const adjMap = buildAdjacencyMap(pools, coins, orderbooks);
 
   while (queue.length && paths.length < maxPaths) {
     const { coin, path, hops } = queue.shift();
@@ -144,11 +166,11 @@ const findAllPathsBFS = (startCoin, endCoin, pools, maxHops = 6, maxPaths = 20) 
       continue;
     }
 
-    const connectedPools = poolMap.get(coin.ticker) || [];
-    for (const { pool, nextCoin } of connectedPools) {
-      const poolKey = `${coin.ticker}-${pool.id}`;
-      if (visited.has(poolKey)) {continue;}
-      visited.add(poolKey);
+    const edges = adjMap.get(coin.ticker) || [];
+    for (const { edgeKey, nextCoin } of edges) {
+      const visitKey = `${coin.ticker}-${edgeKey}`;
+      if (visited.has(visitKey)) {continue;}
+      visited.add(visitKey);
 
       queue.push({
         coin: nextCoin,
@@ -162,11 +184,12 @@ const findAllPathsBFS = (startCoin, endCoin, pools, maxHops = 6, maxPaths = 20) 
 };
 
 // Find all possible swap paths (select DFS or BFS)
-export const findAllPaths = (startCoin, endCoin, pools, maxHops = 6, algorithm = 'dfs') => {
+// coins + orderbooks are optional — when provided, orderbook-only pairs are included in pathfinding
+export const findAllPaths = (startCoin, endCoin, pools, maxHops = 6, algorithm = 'dfs', coins = [], orderbooks = null) => {
   if (algorithm === 'bfs') {
-    return findAllPathsBFS(startCoin, endCoin, pools, maxHops, 20); // Limit to 20 paths for BFS
+    return findAllPathsBFS(startCoin, endCoin, pools, maxHops, 20, coins, orderbooks);
   }
-  return findAllPathsDFS(startCoin, endCoin, pools, maxHops);
+  return findAllPathsDFS(startCoin, endCoin, pools, maxHops, coins, orderbooks);
 };
 
 // Simulate a single swap in a pool (aligned with backend's swapSingle)
@@ -230,13 +253,95 @@ export const simulateSwap = (pool, inputCoin, amountInBN, isCoinAInput) => {
   };
 };
 
+/**
+ * Simulate filling an order book for a given input amount.
+ * For a buy (inputCoin is quote, outputCoin is base): walk asks (ascending price).
+ * For a sell (inputCoin is base, outputCoin is quote): walk bids (descending price).
+ *
+ * @param {object} depth - { bids: [[price, qty], ...], asks: [[price, qty], ...] } (human-readable values)
+ * @param {'buy'|'sell'} side - 'buy' means spending inputCoin to acquire outputCoin
+ * @param {BigNumber} amountIn - whole-unit input amount
+ * @param {number} inputDp - decimal places of input coin
+ * @param {number} outputDp - decimal places of output coin
+ * @returns {{ amountOut: BigNumber }|null}
+ */
+export const simulateClobFill = (depth, side, amountIn, inputDp, outputDp, userOrders = null, pair = null) => {
+  let levels = side === 'buy' ? (depth.asks || []) : (depth.bids || []);
+  if (levels.length === 0) {return null;}
+
+  // Self-trade prevention: subtract user's own order quantities from depth levels
+  if (userOrders && pair) {
+    const oppositeSide = side === 'buy' ? 'sell' : 'buy';
+    const ownOrders = userOrders.filter(
+      (o) => o.pair === pair && o.side === oppositeSide && ['open', 'partially_filled'].includes(o.status)
+    );
+    if (ownOrders.length > 0) {
+      const ownQtyByPrice = {};
+      for (const o of ownOrders) {
+        const remaining = new BigNumber(o.quantity).minus(o.filledQuantity || '0');
+        if (remaining.gt(0)) {
+          const p = o.price;
+          ownQtyByPrice[p] = (ownQtyByPrice[p] || new BigNumber(0)).plus(remaining);
+        }
+      }
+      levels = levels
+        .map(([priceStr, qtyStr]) => {
+          const ownQty = ownQtyByPrice[priceStr];
+          if (!ownQty) {return [priceStr, qtyStr];}
+          const adjusted = new BigNumber(qtyStr).minus(ownQty);
+          if (adjusted.lte(0)) {return null;}
+          return [priceStr, adjusted.toString()];
+        })
+        .filter(Boolean);
+      if (levels.length === 0) {return null;}
+    }
+  }
+
+  let remaining = amountIn.shiftedBy(-inputDp);
+  let totalOutput = new BigNumber(0);
+
+  for (const [priceStr, qtyStr] of levels) {
+    if (remaining.lte(0)) {break;}
+    const price = new BigNumber(priceStr);
+    const qty = new BigNumber(qtyStr);
+    if (price.lte(0) || qty.lte(0)) {continue;}
+
+    if (side === 'buy') {
+      const maxBaseBuyable = remaining.div(price);
+      const fillQty = BigNumber.min(maxBaseBuyable, qty);
+      const cost = fillQty.times(price);
+      totalOutput = totalOutput.plus(fillQty);
+      remaining = remaining.minus(cost);
+    } else {
+      const fillQty = BigNumber.min(remaining, qty);
+      const revenue = fillQty.times(price);
+      totalOutput = totalOutput.plus(revenue);
+      remaining = remaining.minus(fillQty);
+    }
+  }
+
+  if (totalOutput.lte(0)) {return null;}
+  return { amountOut: totalOutput.shiftedBy(outputDp).integerValue(BigNumber.ROUND_DOWN) };
+};
+
+const deriveClobPairAndSide = (fromTicker, toTicker) => {
+  // Uppercase to match backend normalizeQueueName
+  const from = fromTicker.toUpperCase();
+  const to = toTicker.toUpperCase();
+  const [first, second] = [from, to].sort();
+  const pair = `${first}-${second}`;
+  const side = from === first ? 'buy' : 'sell';
+  return { pair, side };
+};
+
 // Estimate a single path
-export const estimatePath = async (pools, path, inputCoin, amountIn, coins) => {
+export const estimatePath = async (pools, path, inputCoin, amountIn, coins, orderbooks = null, userOrders = null) => {
   let currentAmount = new BigNumber(amountIn).shiftedBy(inputCoin.dp || 8);
   let currentCoin = inputCoin;
   let priceImpact = 0;
   const intermediateAmounts = [];
-  let updatedPools = [...pools]; // Clone pools to simulate reserve updates
+  const enrichedPath = [];
+  let updatedPools = [...pools];
 
   for (const step of path) {
     const poolIndex = updatedPools.findIndex(
@@ -244,10 +349,8 @@ export const estimatePath = async (pools, path, inputCoin, amountIn, coins) => {
         (p.coinA.ticker === step.from && p.coinB.ticker === step.to) ||
         (p.coinB.ticker === step.from && p.coinA.ticker === step.to)
     );
-    if (poolIndex === -1 || !updatedPools[poolIndex].runesCompliant) {return null;}
 
-    const pool = updatedPools[poolIndex];
-    const isCoinAInput = pool.coinA.ticker === step.from;
+    const pool = poolIndex !== -1 ? updatedPools[poolIndex] : null;
     const outputCoin = coins.find((c) => c.ticker === step.to);
     if (!outputCoin) {return null;}
 
@@ -257,23 +360,74 @@ export const estimatePath = async (pools, path, inputCoin, amountIn, coins) => {
       return null;
     }
 
-    const swapResult = simulateSwap(pool, currentCoin, currentAmount, isCoinAInput);
-    if (!swapResult || swapResult.amountOut.lte(0)) {return null;}
+    // AMM simulation (only if pool exists and is compliant)
+    let ammOut = null;
+    let swapResult = null;
+    if (pool && pool.runesCompliant) {
+      const isCoinAInput = pool.coinA.ticker === step.from;
+      swapResult = simulateSwap(pool, currentCoin, currentAmount, isCoinAInput);
+      if (swapResult && swapResult.amountOut.gt(0)) {
+        ammOut = swapResult.amountOut;
+      }
+    }
 
-    const { amountOut: amountOutBN, updatedPool } = swapResult;
+    // CLOB simulation
+    let clobOut = null;
+    if (orderbooks) {
+      const { pair: clobPair, side: clobSide } = deriveClobPairAndSide(step.from, step.to);
+      const depth = orderbooks[clobPair];
+      if (depth) {
+        const clobResult = simulateClobFill(depth, clobSide, currentAmount, currentCoinDp, outputCoin.dp || 8, userOrders, clobPair);
+        if (clobResult && clobResult.amountOut.gt(0)) {
+          clobOut = clobResult.amountOut;
+        }
+      }
+    }
 
-    // Update the pool in the cloned pools array
-    updatedPools[poolIndex] = updatedPool;
+    // Pick best venue
+    let amountOutBN;
+    let venue;
+    if (ammOut && clobOut) {
+      if (clobOut.gt(ammOut)) {
+        amountOutBN = clobOut;
+        venue = 'clob';
+      } else {
+        amountOutBN = ammOut;
+        venue = 'amm';
+      }
+    } else if (ammOut) {
+      amountOutBN = ammOut;
+      venue = 'amm';
+    } else if (clobOut) {
+      amountOutBN = clobOut;
+      venue = 'clob';
+    } else {
+      return null;
+    }
 
-    const reserveA = new BigNumber(pool.reserveA);
-    const reserveB = new BigNumber(pool.reserveB);
-    const spotPrice = isCoinAInput ? reserveB.div(reserveA) : reserveA.div(reserveB);
-    const totalFeeRate = new BigNumber(pool.lpFeeRate).plus(pool.treasuryFeeRate).div(100);
-    const effectivePrice = amountOutBN.div(
-      currentAmount.times(new BigNumber(1).minus(totalFeeRate))
-    );
-    const stepPriceImpact = spotPrice.minus(effectivePrice).div(spotPrice).abs().toNumber();
-    priceImpact += stepPriceImpact;
+    if (venue === 'amm' && swapResult) {
+      updatedPools[poolIndex] = swapResult.updatedPool;
+    }
+
+    if (pool && venue === 'amm') {
+      const isCoinAInput = pool.coinA.ticker === step.from;
+      const reserveA = new BigNumber(pool.reserveA);
+      const reserveB = new BigNumber(pool.reserveB);
+      const spotPrice = isCoinAInput ? reserveB.div(reserveA) : reserveA.div(reserveB);
+      const totalFeeRate = new BigNumber(pool.lpFeeRate).plus(pool.treasuryFeeRate).div(100);
+      const effectivePrice = amountOutBN.div(
+        currentAmount.times(new BigNumber(1).minus(totalFeeRate))
+      );
+      const stepPriceImpact = spotPrice.minus(effectivePrice).div(spotPrice).abs().toNumber();
+      priceImpact += stepPriceImpact;
+    }
+
+    enrichedPath.push({
+      from: step.from,
+      to: step.to,
+      venue,
+      output: amountOutBN.shiftedBy(-(outputCoin.dp || 8)).toString(),
+    });
 
     currentAmount = amountOutBN;
     currentCoin = outputCoin;
@@ -300,10 +454,12 @@ export const estimatePath = async (pools, path, inputCoin, amountIn, coins) => {
     priceImpact: priceImpact / path.length,
     intermediateAmounts,
     updatedPools,
+    enrichedPath,
   };
 };
 
 // Main estimateSwap function
+// orderbooks: optional { [pair]: { bids, asks } } for CLOB comparison per hop
 export const estimateSwap = async (
   inputCoin,
   outputCoin,
@@ -311,9 +467,10 @@ export const estimateSwap = async (
   pools,
   coins,
   maxHops = 6,
-  algorithm = 'dfs' // Default to DFS
+  algorithm = 'dfs',
+  orderbooks = null,
+  userOrders = null,
 ) => {
-  // Validate inputs
   if (!inputCoin || !outputCoin) {
     throw new Error('Input or output coin not provided');
   }
@@ -347,19 +504,17 @@ export const estimateSwap = async (
     );
   }
 
-  // Find all paths using the specified algorithm
-  const paths = findAllPaths(inputCoinData, outputCoinData, pools, maxHops, algorithm);
+  const paths = findAllPaths(inputCoinData, outputCoinData, pools, maxHops, algorithm, coins, orderbooks);
   if (!paths.length) {
     throw new Error('No valid swap paths found with RUNES-compliant pools');
   }
 
-  // Estimate each path
   let bestPath = null;
   let maxAmountOut = new BigNumber(0);
   let bestResult = null;
 
   for (const path of paths) {
-    const result = await estimatePath(pools, path, inputCoinData, amountIn, coins);
+    const result = await estimatePath(pools, path, inputCoinData, amountIn, coins, orderbooks, userOrders);
     if (result && result.amountOut.gt(maxAmountOut)) {
       maxAmountOut = result.amountOut;
       bestPath = path;
@@ -371,7 +526,6 @@ export const estimateSwap = async (
     throw new Error('No valid swap path with positive output using RUNES-compliant pools');
   }
 
-  // Calculate USD prices
   const runesPriceUSD = await getRunesPriceUSD(pools);
   const priceAInRunes = getTokenPriceInRunes(inputCoinData, pools);
   const priceBInRunes = getTokenPriceInRunes(outputCoinData, pools);
@@ -388,8 +542,6 @@ export const estimateSwap = async (
     .times(priceBUSD)
     .toString();
 
-  // After-swap prices: use the already-simulated updated pools from bestResult
-  // (estimatePath already tracks post-swap reserve states, no need to re-simulate)
   const runesPriceUSDAfter = getRunesPriceUSD(bestResult.updatedPools);
   const priceAInRunesAfter = new BigNumber(getTokenPriceInRunes(inputCoinData, bestResult.updatedPools));
   const priceBInRunesAfter = new BigNumber(getTokenPriceInRunes(outputCoinData, bestResult.updatedPools));
@@ -417,7 +569,7 @@ export const estimateSwap = async (
       [inputCoin.ticker]: priceAInRunesAfter.times(runesPriceUSDAfter).toString(),
       [outputCoin.ticker]: priceBInRunesAfter.times(runesPriceUSDAfter).toString(),
     },
-    path: bestPath,
-    algorithm, // Include algorithm in the response
+    path: bestResult.enrichedPath,
+    algorithm,
   };
 };
