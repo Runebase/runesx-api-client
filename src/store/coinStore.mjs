@@ -17,6 +17,8 @@ const setInitialCoins = (coins) => {
       projectName: coin.projectName,
       status: coin.status,
       runesComplianceRequirement: coin.runesComplianceRequirement || false,
+      swapMinimumInput: coin.swapMinimumInput,
+      tradeMinimumInput: coin.tradeMinimumInput,
       updatedAt: coin.updatedAt,
       CoinChains: coin.CoinChains || [],
     });
@@ -54,6 +56,8 @@ const updateCoin = (coin) => {
       projectName: coin.projectName,
       status: coin.status,
       runesComplianceRequirement: coin.runesComplianceRequirement || false,
+      swapMinimumInput: coin.swapMinimumInput !== undefined ? coin.swapMinimumInput : existingCoin.swapMinimumInput,
+      tradeMinimumInput: coin.tradeMinimumInput !== undefined ? coin.tradeMinimumInput : existingCoin.tradeMinimumInput,
       updatedAt: coin.updatedAt,
       CoinChains: coin.CoinChains || existingCoin.CoinChains,
     });
@@ -65,6 +69,8 @@ const updateCoin = (coin) => {
       projectName: coin.projectName,
       status: coin.status,
       runesComplianceRequirement: coin.runesComplianceRequirement || false,
+      swapMinimumInput: coin.swapMinimumInput,
+      tradeMinimumInput: coin.tradeMinimumInput,
       updatedAt: coin.updatedAt,
       CoinChains: coin.CoinChains || [],
     });

@@ -8,11 +8,13 @@ const exchangeConfigStore = {
     makerFeeRate: '0.001',
     maxFillBatch: 50,
     maxFillTotal: 500,
+    maxPriceDeviation: '5',
+    tickerPattern: null,
   },
 };
 
 const setExchangeConfig = (config) => {
-  const { clobFees } = config;
+  const { clobFees, tickerPattern } = config;
   if (clobFees) {
     if (clobFees.takerFeeRate !== null && clobFees.takerFeeRate !== undefined) {
       exchangeConfigStore.clobFees.takerFeeRate = clobFees.takerFeeRate;
@@ -26,6 +28,15 @@ const setExchangeConfig = (config) => {
     if (clobFees.maxFillTotal !== null && clobFees.maxFillTotal !== undefined) {
       exchangeConfigStore.clobFees.maxFillTotal = clobFees.maxFillTotal;
     }
+    if (clobFees.maxPriceDeviation !== null && clobFees.maxPriceDeviation !== undefined) {
+      exchangeConfigStore.clobFees.maxPriceDeviation = clobFees.maxPriceDeviation;
+    }
+  }
+  // tickerPattern is at the top level of the config, not inside clobFees.
+  // Merge it into clobFees so swapUtils.deriveClobPairAndSide can access it
+  // via clobFees.tickerPattern — matching how runesx-app passes it.
+  if (typeof tickerPattern === 'string' && tickerPattern.length <= 100) {
+    exchangeConfigStore.clobFees.tickerPattern = tickerPattern;
   }
 };
 
@@ -37,6 +48,8 @@ const resetExchangeConfig = () => {
     makerFeeRate: '0.001',
     maxFillBatch: 50,
     maxFillTotal: 500,
+    maxPriceDeviation: '5',
+    tickerPattern: null,
   };
 };
 
