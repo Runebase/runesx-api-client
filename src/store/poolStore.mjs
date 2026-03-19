@@ -1,4 +1,4 @@
-import { BigNumber } from 'bignumber.js';
+import { SafeBigNumber as BigNumber } from '../utils/safeBigNumber.mjs';
 
 const poolStore = {
   pools: new Map(), // Store pool data by pool ID

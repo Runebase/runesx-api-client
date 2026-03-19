@@ -1,4 +1,4 @@
-import { BigNumber } from 'bignumber.js';
+import { SafeBigNumber as BigNumber } from '../utils/safeBigNumber.mjs';
 
 const walletStore = {
   wallets: new Map(), // Store wallet data by ticker

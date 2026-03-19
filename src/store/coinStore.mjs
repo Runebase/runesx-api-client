@@ -1,4 +1,4 @@
-import { BigNumber } from 'bignumber.js';
+import { SafeBigNumber as BigNumber } from '../utils/safeBigNumber.mjs';
 
 const coinStore = {
   coins: new Map(), // Store coin data by coin ID

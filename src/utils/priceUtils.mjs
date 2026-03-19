@@ -1,8 +1,9 @@
 // src/utils/priceUtils.mjs
-import { BigNumber } from 'bignumber.js';
 
 import { getPools } from '../store/poolStore.mjs';
 import { getCoinByTicker } from '../store/coinStore.mjs';
+
+import { SafeBigNumber as BigNumber } from './safeBigNumber.mjs';
 
 export function createPriceUtils() {
   const getRunesPriceUSD = () => {

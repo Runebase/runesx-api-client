@@ -1,5 +1,5 @@
 // src/store/userSharesStore.mjs
-import { BigNumber } from 'bignumber.js';
+import { SafeBigNumber as BigNumber } from '../utils/safeBigNumber.mjs';
 
 const userSharesStore = {
   userShares: new Map(),

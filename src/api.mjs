@@ -341,6 +341,73 @@ export function createApi(config) {
     }
   }
 
+  // ---- Orders endpoints ----
+
+  async function placeOrder({ pair, side, price, quantity, timeInForce, inverted, idempotencyKey }) {
+    try {
+      const key = idempotencyKey || randomUUID();
+      const body = { pair, side, price, quantity, timeInForce };
+      if (inverted !== undefined && inverted !== null) {
+        body.inverted = inverted;
+      }
+      const response = await api.post('/orders', body, {
+        headers: { 'x-idempotency-key': key },
+      });
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.error || 'Failed to place order');
+    }
+  }
+
+  async function cancelOrder(orderId, { idempotencyKey } = {}) {
+    try {
+      const headers = {};
+      if (idempotencyKey) {
+        headers['x-idempotency-key'] = idempotencyKey;
+      }
+      const response = await api.delete(`/orders/${encodeURIComponent(orderId)}`, { headers });
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.error || 'Failed to cancel order');
+    }
+  }
+
+  async function getOrders({ pair, status, limit, offset } = {}) {
+    try {
+      const params = {};
+      if (pair) { params.pair = pair; }
+      if (status) { params.status = status; }
+      if (limit) { params.limit = limit; }
+      if (offset !== undefined && offset !== null) { params.offset = offset; }
+      const response = await api.get('/orders', { params });
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.error || 'Failed to fetch orders');
+    }
+  }
+
+  async function getOrderBookApi(pair, { levels } = {}) {
+    try {
+      const params = {};
+      if (levels) { params.levels = levels; }
+      const response = await api.get(`/orders/book/${encodeURIComponent(pair)}`, { params });
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.error || 'Failed to fetch order book');
+    }
+  }
+
+  async function getTrades(pair, { limit } = {}) {
+    try {
+      const params = {};
+      if (limit) { params.limit = limit; }
+      const response = await api.get(`/orders/trades/${encodeURIComponent(pair)}`, { params });
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.error || 'Failed to fetch trades');
+    }
+  }
+
   async function deleteYardMessage(messageId) {
     try {
       const response = await api.delete(`/yard/messages/${encodeURIComponent(messageId)}`);
@@ -385,5 +452,11 @@ export function createApi(config) {
     getTransactionHistory,
     getUserOperations,
     deleteYardMessage,
+    // Orders
+    placeOrder,
+    cancelOrder,
+    getOrders,
+    getOrderBookApi,
+    getTrades,
   };
 }

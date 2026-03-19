@@ -7,6 +7,8 @@ import { setInitialChains, updateChain, resetChains } from './store/chainStore.m
 import { setInitialWallets, updateWallet, resetWallets } from './store/walletStore.mjs';
 import { setInitialUserShares, updateUserShare, resetUserShares } from './store/userSharesStore.mjs';
 import { setInitialOrderBooks, updateOrderBook, resetOrderBooks, setUserOrders, updateUserOrder } from './store/orderbookStore.mjs';
+import { setInitialMarkets, addOrUpdateMarket, resetMarkets } from './store/marketStore.mjs';
+import { setExchangeConfig } from './store/exchangeConfigStore.mjs';
 
 export function setupSocket(config) {
   const socket = io(config.socketUrl, {
@@ -55,6 +57,7 @@ export function setupSocket(config) {
       resetWallets();
       resetUserShares();
       resetOrderBooks();
+      resetMarkets();
     }
     emit('connect_error', err);
   });
@@ -67,6 +70,7 @@ export function setupSocket(config) {
     resetChains();
     resetWallets();
     resetUserShares();
+    resetMarkets();
     emit('disconnect', reason);
   });
 
@@ -99,6 +103,26 @@ export function setupSocket(config) {
   });
 
   // ---- Public room events ----
+
+  socket.on('exchange_config', (config) => {
+    setExchangeConfig(config);
+    emit('exchange_config', config);
+  });
+
+  socket.on('markets_initial', (data) => {
+    setInitialMarkets(data);
+    emit('markets_initial', data);
+  });
+
+  socket.on('market_created', (data) => {
+    addOrUpdateMarket(data);
+    emit('market_created', data);
+  });
+
+  socket.on('market_updated', (data) => {
+    addOrUpdateMarket(data);
+    emit('market_updated', data);
+  });
 
   socket.on('pools_updated', ({ pools, isInitial }) => {
     if (isInitial) {

@@ -8,6 +8,8 @@ import { getChains, getChainByName } from './store/chainStore.mjs';
 import { getWallets as getWalletsStore, getWalletByTicker } from './store/walletStore.mjs';
 import { getUserShares, getUserShareByPoolId } from './store/userSharesStore.mjs';
 import { getAllOrderBooks, getOrderBook, getOrderBookPairs, getUserOrders } from './store/orderbookStore.mjs';
+import { getMarkets, getMarketByCoinKey, getMarketByCoins } from './store/marketStore.mjs';
+import { getClobFees } from './store/exchangeConfigStore.mjs';
 import { waitForStores } from './waitForStores.mjs';
 import { estimateLiquidityFrontend, checkRunesLiquidityFrontend, calculateShareAmounts, estimateDepositShares } from './utils/liquidityUtils.mjs';
 import { estimateSwap } from './utils/swapUtils.mjs';
@@ -59,6 +61,8 @@ export function createRunesXClient(options = {}) {
     getOrderBook,
     getOrderBookPairs,
     getUserOrders,
+    getMarkets,
+    getMarketByCoins,
 
     // ---- Event callbacks ----
     on: (event, callback) => {
@@ -138,13 +142,20 @@ export function createRunesXClient(options = {}) {
     getVolumePool: api.getVolumePool,
     getBucketsPools: api.getBucketsPools,
 
+    // ---- Orders API (auth required for place/cancel/getOrders, public for book/trades) ----
+    placeOrder: api.placeOrder,
+    cancelOrder: api.cancelOrder,
+    getOrders: api.getOrders,
+    getOrderBookApi: api.getOrderBookApi,
+    getTrades: api.getTrades,
+
     // ---- Yard (chat) API ----
     getYardMessages: api.getYardMessages,
     deleteYardMessage: api.deleteYardMessage,
 
     // ---- Client-side estimation utilities ----
     estimateSwap: (inputCoin, outputCoin, amountIn, maxHops = 6, algorithm = 'dfs') =>
-      estimateSwap(inputCoin, outputCoin, amountIn, getPools(), getCoins(), maxHops, algorithm, getAllOrderBooks(), getUserOrders()),
+      estimateSwap(inputCoin, outputCoin, amountIn, getPools(), getCoins(), maxHops, algorithm, getAllOrderBooks(), getUserOrders(), getClobFees(), getMarketByCoinKey()),
     estimateLiquidityFrontend,
     estimateDepositShares: ({ pool, amountA, amountB, slippagePercent } = {}) =>
       estimateDepositShares({ pool, amountA, amountB, slippagePercent }),

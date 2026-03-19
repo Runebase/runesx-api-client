@@ -1,6 +1,5 @@
 // src/utils/liquidityUtils.mjs
-import { BigNumber } from 'bignumber.js';
-
+import { SafeBigNumber as BigNumber } from './safeBigNumber.mjs';
 import { getRunesPriceUSD, getTokenPriceInRunes } from './swapUtils.mjs';
 
 export function normalizeTokenPairFrontend(coinA, coinB, pools) {
