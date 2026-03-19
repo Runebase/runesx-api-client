@@ -154,8 +154,12 @@ export function createRunesXClient(options = {}) {
     deleteYardMessage: api.deleteYardMessage,
 
     // ---- Client-side estimation utilities ----
-    estimateSwap: (inputCoin, outputCoin, amountIn, maxHops = 6, algorithm = 'dfs') =>
-      estimateSwap(inputCoin, outputCoin, amountIn, getPools(), getCoins(), maxHops, algorithm, getAllOrderBooks(), getUserOrders(), getClobFees(), getMarketByCoinKey()),
+    // skipSelfTradeCheck: pass true when estimating on behalf of a different user
+    // (e.g. tipbot swaps) — the API key user's CLOB orders would incorrectly
+    // trigger self-trade prevention against bids/asks that the actual swap user
+    // (a Discord user with no CLOB orders) would freely fill.
+    estimateSwap: (inputCoin, outputCoin, amountIn, maxHops = 6, algorithm = 'dfs', { skipSelfTradeCheck = false } = {}) =>
+      estimateSwap(inputCoin, outputCoin, amountIn, getPools(), getCoins(), maxHops, algorithm, getAllOrderBooks(), skipSelfTradeCheck ? null : getUserOrders(), getClobFees(), getMarketByCoinKey()),
     estimateLiquidityFrontend,
     estimateDepositShares: ({ pool, amountA, amountB, slippagePercent } = {}) =>
       estimateDepositShares({ pool, amountA, amountB, slippagePercent }),
