@@ -13,23 +13,23 @@
     "test": "jest"
   },
   "dependencies": {
-    "axios": "^1.13.5",
-    "bignumber.js": "^9.1.2",
+    "axios": "^1.13.6",
+    "bignumber.js": "^10.0.2",
     "socket.io-client": "^4.8.3"
   },
   "devDependencies": {
     "@eslint/js": "^9.11.1",
     "@semantic-release/changelog": "^6.0.3",
     "@semantic-release/git": "^10.0.1",
-    "@semantic-release/npm": "^13.1.4",
+    "@semantic-release/npm": "^13.1.5",
     "dotenv": "^17.3.1",
     "eslint": "^9.11.1",
     "eslint-plugin-import": "^2.30.0",
     "eslint-plugin-n": "^17.24.0",
     "eslint-plugin-promise": "^7.1.0",
-    "globals": "^17.3.0",
-    "jest": "^30.2.0",
-    "nodemon": "^3.1.11",
+    "globals": "^17.4.0",
+    "jest": "^30.3.0",
+    "nodemon": "^3.1.14",
     "semantic-release": "^25.0.3"
   },
   "files": [
