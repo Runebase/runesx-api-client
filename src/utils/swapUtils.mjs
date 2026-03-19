@@ -11,7 +11,7 @@ import { SafeBigNumber as BigNumber } from './safeBigNumber.mjs';
  * @returns {number}
  */
 const getDp = (coin) => {
-  if (coin.dp == null || typeof coin.dp !== 'number') {
+  if (coin.dp === null || coin.dp === undefined || typeof coin.dp !== 'number') {
     throw new Error(`Coin ${coin.ticker || 'unknown'} is missing dp (decimal places)`);
   }
   return coin.dp;
@@ -50,7 +50,7 @@ function getPoolByTickers(pools, tickerA, tickerB) {
   if (_poolMapSource !== pools || _poolMapSourceLen !== pools.length) {
     _poolMapCache = new Map();
     for (const p of pools) {
-      if (!p || !p.coinA || !p.coinB) continue;
+      if (!p || !p.coinA || !p.coinB) {continue;}
       const key = [p.coinA.ticker, p.coinB.ticker].sort().join('-');
       _poolMapCache.set(key, p);
     }
@@ -99,7 +99,7 @@ export const getRunesPriceUSD = (pools) => {
 
 // Get token price in RUNES
 export const getTokenPriceInRunes = (token, pools) => {
-  if (token.ticker === 'RUNES') return '1';
+  if (token.ticker === 'RUNES') {return '1';}
   const pool = getPoolByTickers(pools, 'RUNES', token.ticker);
   if (!pool || new BigNumber(pool.reserveA).isZero() || new BigNumber(pool.reserveB).isZero()) {
     return '0';
@@ -133,11 +133,11 @@ const buildAdjacencyMap = (pools, coins, orderbooks) => {
 
   // Add edges from pools
   pools.forEach((pool) => {
-    if (!pool.runesCompliant || new BigNumber(pool.reserveA).isZero() || new BigNumber(pool.reserveB).isZero()) return;
+    if (!pool.runesCompliant || new BigNumber(pool.reserveA).isZero() || new BigNumber(pool.reserveB).isZero()) {return;}
     const keyA = pool.coinA.ticker;
     const keyB = pool.coinB.ticker;
-    if (!adjMap.has(keyA)) adjMap.set(keyA, []);
-    if (!adjMap.has(keyB)) adjMap.set(keyB, []);
+    if (!adjMap.has(keyA)) {adjMap.set(keyA, []);}
+    if (!adjMap.has(keyB)) {adjMap.set(keyB, []);}
     adjMap.get(keyA).push({ edgeKey: pool.id, nextCoin: pool.coinB });
     adjMap.get(keyB).push({ edgeKey: pool.id, nextCoin: pool.coinA });
     const sorted = [keyA, keyB].sort();
@@ -156,7 +156,7 @@ const buildAdjacencyMap = (pools, coins, orderbooks) => {
       }
 
       const parts = pair.split('-');
-      if (parts.length !== 2) continue;
+      if (parts.length !== 2) {continue;}
       // Uppercase tickers for case-insensitive matching: pool edges use
       // pool.coinA.ticker (already uppercase from DB), but legacy coin data
       // could have lowercase tickers. Without uppercasing, a coin with ticker
@@ -171,8 +171,8 @@ const buildAdjacencyMap = (pools, coins, orderbooks) => {
       }
 
       const edgeKey = `ob:${pair}`;
-      if (!adjMap.has(coinA.ticker)) adjMap.set(coinA.ticker, []);
-      if (!adjMap.has(coinB.ticker)) adjMap.set(coinB.ticker, []);
+      if (!adjMap.has(coinA.ticker)) {adjMap.set(coinA.ticker, []);}
+      if (!adjMap.has(coinB.ticker)) {adjMap.set(coinB.ticker, []);}
       adjMap.get(coinA.ticker).push({ edgeKey, nextCoin: coinB });
       adjMap.get(coinB.ticker).push({ edgeKey, nextCoin: coinA });
       edgePairs.add(pair);
@@ -189,7 +189,7 @@ const findAllPathsDFS = (startCoin, endCoin, pools, maxHops = 6, coins = [], ord
   const adjMap = buildAdjacencyMap(pools, coins, orderbooks);
 
   function dfs(currentCoin, currentPath, hops) {
-    if (hops > maxHops) return;
+    if (hops > maxHops) {return;}
     if (currentCoin.ticker === endCoin.ticker) {
       paths.push([...currentPath]);
       return;
@@ -197,7 +197,7 @@ const findAllPathsDFS = (startCoin, endCoin, pools, maxHops = 6, coins = [], ord
 
     const edges = adjMap.get(currentCoin.ticker) || [];
     for (const { edgeKey, nextCoin } of edges) {
-      if (visited.has(edgeKey)) continue;
+      if (visited.has(edgeKey)) {continue;}
       visited.add(edgeKey);
 
       currentPath.push({
@@ -226,7 +226,7 @@ const findAllPathsBFS = (startCoin, endCoin, pools, maxHops = 6, maxPaths = 20, 
 
   while (queue.length && paths.length < maxPaths) {
     const { coin, path, hops, visitedEdges } = queue.shift();
-    if (hops > maxHops) continue;
+    if (hops > maxHops) {continue;}
     if (coin.ticker === endCoin.ticker) {
       paths.push(path);
       continue;
@@ -234,7 +234,7 @@ const findAllPathsBFS = (startCoin, endCoin, pools, maxHops = 6, maxPaths = 20, 
 
     const edges = adjMap.get(coin.ticker) || [];
     for (const { edgeKey, nextCoin } of edges) {
-      if (visitedEdges.has(edgeKey)) continue;
+      if (visitedEdges.has(edgeKey)) {continue;}
 
       const newVisited = new Set(visitedEdges);
       newVisited.add(edgeKey);
@@ -262,7 +262,7 @@ export const findAllPaths = (startCoin, endCoin, pools, maxHops = 6, algorithm =
 
 // Simulate a single swap in a pool (aligned with backend's swapSingle)
 export const simulateSwap = (pool, inputCoin, amountInBN, isCoinAInput) => {
-  if (!pool.runesCompliant) return null;
+  if (!pool.runesCompliant) {return null;}
 
   // Validate dp from socket-delivered pool data. A corrupted payload with
   // dp outside [0,18] would produce astronomically wrong estimates via
@@ -271,13 +271,13 @@ export const simulateSwap = (pool, inputCoin, amountInBN, isCoinAInput) => {
   const coinADp = pool.coinA?.dp;
   const coinBDp = pool.coinB?.dp;
   if (!Number.isInteger(coinADp) || coinADp < 0 || coinADp > 18
-    || !Number.isInteger(coinBDp) || coinBDp < 0 || coinBDp > 18) return null;
+    || !Number.isInteger(coinBDp) || coinBDp < 0 || coinBDp > 18) {return null;}
 
-  if (amountInBN.lt(1)) return null;
+  if (amountInBN.lt(1)) {return null;}
 
   const reserveABN = new BigNumber(pool.reserveA);
   const reserveBBN = new BigNumber(pool.reserveB);
-  if (reserveABN.isZero() || reserveBBN.isZero()) return null;
+  if (reserveABN.isZero() || reserveBBN.isZero()) {return null;}
 
   const lpFeeRate = new BigNumber(pool.lpFeeRate).div(100);
   const treasuryFeeRate = new BigNumber(pool.treasuryFeeRate).div(100);
@@ -288,7 +288,7 @@ export const simulateSwap = (pool, inputCoin, amountInBN, isCoinAInput) => {
   // nonsensical estimates (negative output, NaN, etc). (Audit fix L6, 2026-03-18)
   if (lpFeeRate.isNaN() || !lpFeeRate.isFinite() || lpFeeRate.lt(0)
     || treasuryFeeRate.isNaN() || !treasuryFeeRate.isFinite() || treasuryFeeRate.lt(0)
-    || totalFeeRate.gte(1) || totalFeeRate.gt('0.05')) return null;
+    || totalFeeRate.gte(1) || totalFeeRate.gt('0.05')) {return null;}
 
   // Calculate total fee and split proportionally
   const totalFeeAmount = amountInBN.times(totalFeeRate).integerValue(BigNumber.ROUND_DOWN);
@@ -300,7 +300,7 @@ export const simulateSwap = (pool, inputCoin, amountInBN, isCoinAInput) => {
   }
 
   const amountInForPool = amountInBN.minus(totalFeeAmount);
-  if (amountInForPool.lt(1)) return null;
+  if (amountInForPool.lt(1)) {return null;}
 
   let amountOutBN;
   if (isCoinAInput) {
@@ -310,7 +310,7 @@ export const simulateSwap = (pool, inputCoin, amountInBN, isCoinAInput) => {
   }
   amountOutBN = amountOutBN.integerValue(BigNumber.ROUND_DOWN);
 
-  if (amountOutBN.isNaN() || !amountOutBN.isFinite() || amountOutBN.lt(1)) return null;
+  if (amountOutBN.isNaN() || !amountOutBN.isFinite() || amountOutBN.lt(1)) {return null;}
 
   // MIN_RESERVE_THRESHOLD: matches backend swapSingle's check in swapCore.mjs.
   // Without this, the frontend could show estimates for swaps that the backend
@@ -319,7 +319,7 @@ export const simulateSwap = (pool, inputCoin, amountInBN, isCoinAInput) => {
   const newResOut = isCoinAInput
     ? reserveBBN.minus(amountOutBN)
     : reserveABN.minus(amountOutBN);
-  if (newResOut.lt(MIN_RESERVE_THRESHOLD)) return null;
+  if (newResOut.lt(MIN_RESERVE_THRESHOLD)) {return null;}
 
   // Simulate reserve updates (mimicking backend)
   const updatedPool = { ...pool };
@@ -385,7 +385,7 @@ export const simulateClobFill = (depth, side, amountIn, inputDp, outputDp, userO
   // side = 'buy': we spend quote coin, walk asks, receive base coin
   // side = 'sell': we spend base coin, walk bids, receive quote coin
   const levels = side === 'buy' ? (depth.asks || []) : (depth.bids || []);
-  if (levels.length === 0) return null;
+  if (levels.length === 0) {return null;}
 
   // Price deviation guard (audit fix M6, 2026-03-17):
   // Matches backend fillFromOrderBook.mjs and matchingEngine.mjs — if the
@@ -432,7 +432,7 @@ export const simulateClobFill = (depth, side, amountIn, inputDp, outputDp, userO
         userQtyByPrice.set(priceKey, existing.plus(remaining));
         // Track individual remaining quantities for per-order size matching at
         // self-trade boundary levels. (Audit fix L2, 2026-03-17)
-        if (!userRemainingsByPrice.has(priceKey)) userRemainingsByPrice.set(priceKey, []);
+        if (!userRemainingsByPrice.has(priceKey)) {userRemainingsByPrice.set(priceKey, []);}
         userRemainingsByPrice.get(priceKey).push(remaining.toString());
       }
       // Best (first-encountered) self-trade price determines the boundary.
@@ -507,7 +507,7 @@ export const simulateClobFill = (depth, side, amountIn, inputDp, outputDp, userO
   let prevCumulativeCeil = new BigNumber(0);
 
   for (const level of levels) {
-    if (remainingInput.lte(0)) break;
+    if (remainingInput.lte(0)) {break;}
 
     const [priceStr, qtyStr, orderCount, ...perOrderSizes] = level;
 
@@ -527,8 +527,8 @@ export const simulateClobFill = (depth, side, amountIn, inputDp, outputDp, userO
     // the user's. (Audit fix M5, 2026-03-16; aligned H5, 2026-03-17)
     let isSelfTradeLevel = false;
     if (selfTradePriceBN) {
-      if (side === 'buy' && priceHuman.gt(selfTradePriceBN)) break;
-      if (side === 'sell' && priceHuman.lt(selfTradePriceBN)) break;
+      if (side === 'buy' && priceHuman.gt(selfTradePriceBN)) {break;}
+      if (side === 'sell' && priceHuman.lt(selfTradePriceBN)) {break;}
       isSelfTradeLevel = priceHuman.eq(selfTradePriceBN);
     }
     let qtyHuman = new BigNumber(qtyStr);
@@ -536,7 +536,7 @@ export const simulateClobFill = (depth, side, amountIn, inputDp, outputDp, userO
       const userQty = userQtyByPrice.get(priceHuman.toString());
       if (userQty && userQty.gt(0)) {
         qtyHuman = qtyHuman.minus(userQty);
-        if (qtyHuman.lte(0)) break; // entire level is user's orders
+        if (qtyHuman.lte(0)) {break;} // entire level is user's orders
       }
     }
     // Guard against NaN/non-finite values from corrupted socket payloads.
@@ -545,7 +545,7 @@ export const simulateClobFill = (depth, side, amountIn, inputDp, outputDp, userO
     // bypassing the final lte(0) return check. Explicit NaN/finite guards
     // match backend matchingEngine.mjs:133. (Audit fix H1, 2026-03-18)
     if (priceHuman.isNaN() || !priceHuman.isFinite() || priceHuman.lte(0)
-      || qtyHuman.isNaN() || !qtyHuman.isFinite() || qtyHuman.lte(0)) continue;
+      || qtyHuman.isNaN() || !qtyHuman.isFinite() || qtyHuman.lte(0)) {continue;}
 
     // Price deviation guard (audit fix M6, 2026-03-17):
     // Matches backend fillFromOrderBook.mjs — if the current level's price
@@ -559,7 +559,7 @@ export const simulateClobFill = (depth, side, amountIn, inputDp, outputDp, userO
       const deviation = side === 'buy'
         ? priceHuman.div(bestFillPrice)
         : bestFillPrice.div(priceHuman);
-      if (deviation.gt(MAX_PRICE_DEVIATION)) break;
+      if (deviation.gt(MAX_PRICE_DEVIATION)) {break;}
     }
 
     // Convert level values to whole units (matching backend representation)
@@ -781,7 +781,7 @@ export const simulateClobFill = (depth, side, amountIn, inputDp, outputDp, userO
     // Use orderQuantities.length (not ordersAtLevel) since self-trade
     // filtering may have reduced the number of orders. (Audit fix M3, 2026-03-17)
     for (let orderIdx = 0; orderIdx < orderQuantities.length; orderIdx += 1) {
-      if (remainingInput.lte(0)) break;
+      if (remainingInput.lte(0)) {break;}
       // Per-order cap: matches backend's FOR UPDATE LIMIT across all batches.
       // Stranded dust orders (whose remaining qty produces zero quote) are NOT
       // excluded here — they count against the cap, matching the backend fill
@@ -791,7 +791,7 @@ export const simulateClobFill = (depth, side, amountIn, inputDp, outputDp, userO
       // depth snapshots won't include them. (Audit review H3, 2026-03-17)
       // (Audit fix M1, 2026-03-16)
       totalRowsExamined += 1;
-      if (totalRowsExamined > maxFillTotal) break;
+      if (totalRowsExamined > maxFillTotal) {break;}
 
       const makerQty = orderQuantities[orderIdx];
       // Guard against NaN/non-finite values from corrupted socket payloads.
@@ -800,7 +800,7 @@ export const simulateClobFill = (depth, side, amountIn, inputDp, outputDp, userO
       // accidentally bypasses the final lte(0) check. Explicit NaN/finite
       // check ensures corrupted entries are skipped cleanly.
       // (Audit fix H3, 2026-03-18)
-      if (!makerQty || makerQty.isNaN() || !makerQty.isFinite() || makerQty.lte(0)) continue;
+      if (!makerQty || makerQty.isNaN() || !makerQty.isFinite() || makerQty.lte(0)) {continue;}
 
       let fillQty;
       let inputConsumed;
@@ -810,14 +810,14 @@ export const simulateClobFill = (depth, side, amountIn, inputDp, outputDp, userO
         // maxBuyable = remainingInput * 10^baseDp / makerPrice (ROUND_DOWN — conservative for taker)
         const maxBuyable = remainingInput.times(new BigNumber(10).pow(baseDp)).div(makerPrice).integerValue(BigNumber.ROUND_DOWN);
         fillQty = BigNumber.min(maxBuyable, makerQty);
-        if (fillQty.lte(0)) break;
+        if (fillQty.lte(0)) {break;}
         // Dust-fill guard: skip fills where the quote transfer rounds to zero.
         // Uses `continue` (not `break`) to allow subsequent orders with larger
         // quantities to produce valid fills — aligned with backend
         // fillFromOrderBook.mjs and placeOrder.mjs. (Audit fix M1, 2026-03-17)
         const quoteAmountExact = quoteForLevel(fillQty);
         const quoteAmountFloor = quoteAmountExact.integerValue(BigNumber.ROUND_DOWN);
-        if (quoteAmountFloor.lte(0)) continue;
+        if (quoteAmountFloor.lte(0)) {continue;}
         // Cumulative ceil: derive this fill's cost from the delta between consecutive ceils
         cumulativeExactQuote = cumulativeExactQuote.plus(quoteAmountExact);
         const currentCumulativeCeil = cumulativeExactQuote.integerValue(BigNumber.ROUND_UP);
@@ -826,7 +826,7 @@ export const simulateClobFill = (depth, side, amountIn, inputDp, outputDp, userO
       } else {
         // User spends base (input) whole units, receives quote (output) whole units.
         fillQty = BigNumber.min(remainingInput, makerQty);
-        if (fillQty.lte(0)) break;
+        if (fillQty.lte(0)) {break;}
         inputConsumed = fillQty;
       }
 
@@ -838,21 +838,21 @@ export const simulateClobFill = (depth, side, amountIn, inputDp, outputDp, userO
       // Dust-fill guard for sell side: quote amount rounds to zero at this price.
       // Uses `continue` to allow subsequent orders to produce valid fills —
       // aligned with backend fillFromOrderBook.mjs. (Audit fix M1, 2026-03-17)
-      if (outputThisFill.lte(0)) continue;
+      if (outputThisFill.lte(0)) {continue;}
 
       const takerFee = calculateClobFee(outputThisFill, TAKER_FEE_RATE);
       const netOutput = outputThisFill.minus(takerFee);
 
       totalNetOutput = totalNetOutput.plus(netOutput);
-      if (levelUsedFallback) fallbackOutput = fallbackOutput.plus(netOutput);
+      if (levelUsedFallback) {fallbackOutput = fallbackOutput.plus(netOutput);}
       remainingInput = remainingInput.minus(inputConsumed);
     }
 
     // After filling at the self-trade boundary level, stop — the backend
     // would encounter the user's own order here and halt further fills.
-    if (isSelfTradeLevel) break;
+    if (isSelfTradeLevel) {break;}
     // If per-order cap was hit inside the inner loop, stop outer loop too.
-    if (totalRowsExamined > maxFillTotal) break;
+    if (totalRowsExamined > maxFillTotal) {break;}
   }
 
   // Final NaN guard: if any corrupted level bypassed per-level validation
@@ -860,7 +860,7 @@ export const simulateClobFill = (depth, side, amountIn, inputDp, outputDp, userO
   // the accumulated totalNetOutput could be NaN. BigNumber(NaN).lte(0)
   // returns false, so the check below would NOT catch it — returning
   // { amountOut: NaN } to the caller. (Audit fix H1, 2026-03-18)
-  if (totalNetOutput.isNaN() || !totalNetOutput.isFinite() || totalNetOutput.lte(0)) return null;
+  if (totalNetOutput.isNaN() || !totalNetOutput.isFinite() || totalNetOutput.lte(0)) {return null;}
 
   // totalNetOutput is already in output whole units — return directly
   // inputUsed = total input consumed in whole units (amountIn - remainingInput)
@@ -893,12 +893,12 @@ const DEFAULT_TICKER_PATTERN = /^[A-Z0-9]{1,20}$/;
 const _tickerReCache = new Map();
 const MAX_TICKER_RE_CACHE_SIZE = 20;
 function getTickerRe(pattern) {
-  if (!pattern) return DEFAULT_TICKER_PATTERN;
+  if (!pattern) {return DEFAULT_TICKER_PATTERN;}
   let cached = _tickerReCache.get(pattern);
   if (!cached) {
     try {
       cached = new RegExp(pattern);
-    } catch (_) {
+    } catch {
       cached = DEFAULT_TICKER_PATTERN;
     }
     if (_tickerReCache.size >= MAX_TICKER_RE_CACHE_SIZE) {
@@ -962,21 +962,21 @@ export const estimatePath = (pools, path, inputCoin, amountIn, coins, orderbooks
   // ── Path validation (mirrors backend deriveQueueNamesAndPoolConditions) ──
   // Reject paths that the backend would reject, preventing the user from seeing
   // an estimate for an unsubmittable swap. (Audit fix L4, 2026-03-17)
-  if (!path || path.length === 0) return null;
+  if (!path || path.length === 0) {return null;}
   // Max path length: aligned with backend executeSwapCore (swapCore.mjs) which
   // rejects paths longer than 10 hops. Without this, a direct call to
   // estimatePath with a crafted long path would execute without bounds,
   // consuming CPU on the client. (Audit fix M5, 2026-03-18)
-  if (path.length > 10) return null;
+  if (path.length > 10) {return null;}
   const usedPairs = new Set();
   for (let i = 0; i < path.length; i += 1) {
     const step = path[i];
-    if (!step || typeof step.from !== 'string' || typeof step.to !== 'string') return null; // invalid step structure
-    if (step.from === step.to) return null; // self-pair
-    if (i > 0 && step.from !== path[i - 1].to) return null; // discontinuous
+    if (!step || typeof step.from !== 'string' || typeof step.to !== 'string') {return null;} // invalid step structure
+    if (step.from === step.to) {return null;} // self-pair
+    if (i > 0 && step.from !== path[i - 1].to) {return null;} // discontinuous
     const [first, second] = [step.from.toUpperCase(), step.to.toUpperCase()].sort();
     const pairKey = `${first}-${second}`;
-    if (usedPairs.has(pairKey)) return null; // duplicate pair usage
+    if (usedPairs.has(pairKey)) {return null;} // duplicate pair usage
     usedPairs.add(pairKey);
   }
 
@@ -1005,7 +1005,7 @@ export const estimatePath = (pools, path, inputCoin, amountIn, coins, orderbooks
     const map = new Map();
     for (let idx = 0; idx < poolList.length; idx += 1) {
       const p = poolList[idx];
-      if (!p || !p.coinA || !p.coinB) continue;
+      if (!p || !p.coinA || !p.coinB) {continue;}
       const key = [p.coinA.ticker, p.coinB.ticker].sort().join('-');
       map.set(key, idx);
     }
@@ -1027,7 +1027,7 @@ export const estimatePath = (pools, path, inputCoin, amountIn, coins, orderbooks
     const preHopReserveA = pool ? pool.reserveA : null;
     const preHopReserveB = pool ? pool.reserveB : null;
     const outputCoin = coins.find((c) => c.ticker === step.to);
-    if (!outputCoin) return null;
+    if (!outputCoin) {return null;}
 
     const currentCoinDp = getDp(currentCoin);
     const outputCoinDp = getDp(outputCoin);
@@ -1081,7 +1081,7 @@ export const estimatePath = (pools, path, inputCoin, amountIn, coins, orderbooks
           clobResult = simulateClobFill(depth, clobSide, currentAmount, currentCoinDp, outputCoinDp, userOrders, clobPair, clobFees);
           if (clobResult && clobResult.amountOut.gt(0)) {
             clobOut = clobResult.amountOut;
-            if (clobResult.usedEqualSplitFallback) clobEstimateLowConfidence = true;
+            if (clobResult.usedEqualSplitFallback) {clobEstimateLowConfidence = true;}
           }
         }
       }

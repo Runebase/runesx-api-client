@@ -19,7 +19,7 @@ export function waitForStores(socket) {
         reject(new Error('Timeout waiting for initial pool data'));
       }, 30000); // 30-second timeout
 
-      socket.on('pools_updated', ({ isInitial, pools }) => {
+      socket.on('pools_updated', ({ isInitial }) => {
         if (isInitial) {
           const pools = getPools();
           clearTimeout(timeout);
@@ -54,7 +54,7 @@ export function waitForStores(socket) {
         reject(new Error('Timeout waiting for initial coin data'));
       }, 30000); // 30-second timeout
 
-      socket.on('coins_updated', ({ isInitial, coins }) => {
+      socket.on('coins_updated', ({ isInitial }) => {
         if (isInitial) {
           const coins = getCoins();
           clearTimeout(timeout);
@@ -124,7 +124,7 @@ export function waitForStores(socket) {
         reject(new Error('Timeout waiting for initial wallet data'));
       }, 30000); // 30-second timeout
 
-      socket.on('wallets_updated', ({ isInitial, wallets }) => {
+      socket.on('wallets_updated', ({ isInitial }) => {
         if (isInitial) {
           const wallets = getWallets();
           clearTimeout(timeout);
@@ -159,7 +159,7 @@ export function waitForStores(socket) {
         reject(new Error('Timeout waiting for initial user shares data'));
       }, 30000); // 30-second timeout
 
-      socket.on('user_shares_updated', ({ isInitial, userShares }) => {
+      socket.on('user_shares_updated', ({ isInitial }) => {
         if (isInitial) {
           const userShares = getUserShares();
           clearTimeout(timeout);

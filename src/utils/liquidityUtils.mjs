@@ -110,7 +110,7 @@ export function getPoolRatioFrontend(pool) {
   return reserveADecimal.div(reserveBDecimal);
 }
 
-export function estimateLiquidityFrontend({ coinA, coinB, amountA, amountB, pools, coins }) {
+export function estimateLiquidityFrontend({ coinA, coinB, amountA, amountB, pools }) {
   if ((amountA === null && amountB === null) || (amountA !== null && amountB !== null)) {
     throw new Error('Provide either amountA or amountB, but not both or neither');
   }

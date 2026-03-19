@@ -63,9 +63,9 @@ const setUserOrders = (orders) => {
 
 // Update a single user order (from order_updated event)
 const updateUserOrder = (data) => {
-  if (data.refresh) return; // caller should refetch
+  if (data.refresh) {return;} // caller should refetch
   const order = data.order;
-  if (!order) return;
+  if (!order) {return;}
   const idx = orderbookStore.userOrders.findIndex((o) => o.id === order.id);
   if (idx >= 0) {
     orderbookStore.userOrders[idx] = { ...orderbookStore.userOrders[idx], ...order };
