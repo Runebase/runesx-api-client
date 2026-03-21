@@ -181,7 +181,8 @@ export function createApi(config) {
   async function postSwap({ amountIn, path, minAmountOut, idempotencyKey }) {
     try {
       const key = idempotencyKey || randomUUID();
-      const response = await api.post('/swap', { amountIn, path, minAmountOut }, {
+      const cleanPath = path.map(({ from, to }) => ({ from, to }));
+      const response = await api.post('/swap', { amountIn, path: cleanPath, minAmountOut }, {
         headers: { 'X-Idempotency-Key': key },
       });
       return response.data;
