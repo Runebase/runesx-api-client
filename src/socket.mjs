@@ -10,103 +10,12 @@ import { setInitialOrderBooks, updateOrderBook, resetOrderBooks, setUserOrders, 
 import { setInitialMarkets, addOrUpdateMarket, resetMarkets } from './store/marketStore.mjs';
 import { setExchangeConfig } from './store/exchangeConfigStore.mjs';
 
-export function setupSocket(config) {
-  const socket = io(config.socketUrl, {
-    auth: { authorization: `Bearer ${config.apiKey}` },
-    extraHeaders: { authorization: `Bearer ${config.apiKey}` },
-    transports: ['websocket'],
-    reconnection: true,
-    reconnectionAttempts: Infinity,
-    reconnectionDelay: 1000,
-    reconnectionDelayMax: 5000,
-  });
-
-  const errorCount = { count: 0 };
-
-  // User-registered event callbacks
-  const callbacks = {};
-
-  function emit(event, data) {
-    if (callbacks[event]) {
-      callbacks[event].forEach((cb) => {
-        try { cb(data); } catch (e) { console.error(`Error in ${event} callback:`, e.message); }
-      });
-    }
-  }
-
-  const heartbeatInterval = setInterval(() => {
-    if (socket.connected) {
-      socket.emit('ping');
-    }
-  }, 30000);
-
-  socket.on('connect', () => {
-    socket.emit('join_public');
-    socket.emit('join_private');
-    errorCount.count = 0;
-    emit('connect', null);
-  });
-
-  socket.on('connect_error', (err) => {
-    console.log('Socket connect error:', err.message);
-    errorCount.count += 1;
-    if (errorCount.count >= 3) {
-      resetPools();
-      resetCoins();
-      resetChains();
-      resetWallets();
-      resetUserShares();
-      resetOrderBooks();
-      resetMarkets();
-    }
-    emit('connect_error', err);
-  });
-
-  socket.on('disconnect', (reason) => {
-    console.log('Disconnected from Socket.IO server:', reason);
-    clearInterval(heartbeatInterval);
-    resetPools();
-    resetCoins();
-    resetChains();
-    resetWallets();
-    resetUserShares();
-    resetMarkets();
-    emit('disconnect', reason);
-  });
-
-  socket.io.on('reconnect_attempt', (attempt) => {
-    console.log(`Reconnect attempt #${attempt}`);
-    emit('reconnect_attempt', attempt);
-  });
-
-  socket.io.on('reconnect', () => {
-    emit('reconnect', null);
-  });
-
-  socket.io.on('reconnect_error', (err) => {
-    console.log('Reconnect error:', err.message);
-    errorCount.count += 1;
-    if (errorCount.count >= 3) {
-      resetPools();
-      resetCoins();
-      resetChains();
-      resetWallets();
-      resetUserShares();
-      resetOrderBooks();
-    }
-    emit('reconnect_error', err);
-  });
-
-  socket.on('error', (err) => {
-    console.log('Socket error:', err.message);
-    emit('error', err);
-  });
-
-  // ---- Public room events ----
-
-  socket.on('exchange_config', (config) => {
-    setExchangeConfig(config);
-    emit('exchange_config', config);
+// ---- Shared public event handler registration ----
+// Used by both setupSocket and setupPublicSocket to avoid duplicating handler code.
+function _registerPublicHandlers(socket, emit) {
+  socket.on('exchange_config', (cfg) => {
+    setExchangeConfig(cfg);
+    emit('exchange_config', cfg);
   });
 
   socket.on('markets_initial', (data) => {
@@ -204,6 +113,102 @@ export function setupSocket(config) {
   socket.on('candlestick_updated', (data) => {
     emit('candlestick_updated', data);
   });
+}
+
+export function setupSocket(config) {
+  const socket = io(config.socketUrl, {
+    auth: { authorization: `Bearer ${config.apiKey}` },
+    extraHeaders: { authorization: `Bearer ${config.apiKey}` },
+    transports: ['websocket'],
+    reconnection: true,
+    reconnectionAttempts: Infinity,
+    reconnectionDelay: 1000,
+    reconnectionDelayMax: 5000,
+  });
+
+  const errorCount = { count: 0 };
+
+  // User-registered event callbacks
+  const callbacks = {};
+
+  function emit(event, data) {
+    if (callbacks[event]) {
+      callbacks[event].forEach((cb) => {
+        try { cb(data); } catch (e) { console.error(`Error in ${event} callback:`, e.message); }
+      });
+    }
+  }
+
+  const heartbeatInterval = setInterval(() => {
+    if (socket.connected) {
+      socket.emit('ping');
+    }
+  }, 30000);
+
+  socket.on('connect', () => {
+    socket.emit('join_public');
+    socket.emit('join_private');
+    errorCount.count = 0;
+    emit('connect', null);
+  });
+
+  socket.on('connect_error', (err) => {
+    console.log('Socket connect error:', err.message);
+    errorCount.count += 1;
+    if (errorCount.count >= 3) {
+      resetPools();
+      resetCoins();
+      resetChains();
+      resetWallets();
+      resetUserShares();
+      resetOrderBooks();
+      resetMarkets();
+    }
+    emit('connect_error', err);
+  });
+
+  socket.on('disconnect', (reason) => {
+    console.log('Disconnected from Socket.IO server:', reason);
+    clearInterval(heartbeatInterval);
+    resetPools();
+    resetCoins();
+    resetChains();
+    resetWallets();
+    resetUserShares();
+    resetMarkets();
+    emit('disconnect', reason);
+  });
+
+  socket.io.on('reconnect_attempt', (attempt) => {
+    console.log(`Reconnect attempt #${attempt}`);
+    emit('reconnect_attempt', attempt);
+  });
+
+  socket.io.on('reconnect', () => {
+    emit('reconnect', null);
+  });
+
+  socket.io.on('reconnect_error', (err) => {
+    console.log('Reconnect error:', err.message);
+    errorCount.count += 1;
+    if (errorCount.count >= 3) {
+      resetPools();
+      resetCoins();
+      resetChains();
+      resetWallets();
+      resetUserShares();
+      resetOrderBooks();
+    }
+    emit('reconnect_error', err);
+  });
+
+  socket.on('error', (err) => {
+    console.log('Socket error:', err.message);
+    emit('error', err);
+  });
+
+  // ---- Public room events (shared handler) ----
+  _registerPublicHandlers(socket, emit);
 
   // ---- Private room events ----
 
@@ -303,12 +308,12 @@ export function setupSocket(config) {
     }
   }
 
-  function joinCandlesticks(poolId, timeframe) {
-    socket.emit('join_candlesticks', { poolId, timeframe });
+  function joinCandlesticks(pair, timeframe) {
+    socket.emit('join_candlesticks', { pair, timeframe });
   }
 
-  function leaveCandlesticks(poolId, timeframe) {
-    socket.emit('leave_candlesticks', { poolId, timeframe });
+  function leaveCandlesticks(pair, timeframe) {
+    socket.emit('leave_candlesticks', { pair, timeframe });
   }
 
   function sendYardMessage(text) {
@@ -342,5 +347,146 @@ export function setupSocket(config) {
     markYardRead,
     leavePublic,
     leavePrivate,
+  };
+}
+
+// ---- Public-only socket (no auth) ----
+
+const _storeResetMap = {
+  pools: resetPools,
+  coins: resetCoins,
+  chains: resetChains,
+  orderbooks: resetOrderBooks,
+  markets: resetMarkets,
+};
+
+export function setupPublicSocket(config, requestedStores) {
+  const _requestedStores = new Set(requestedStores);
+
+  const socket = io(config.socketUrl, {
+    transports: ['websocket'],
+    reconnection: true,
+    reconnectionAttempts: Infinity,
+    reconnectionDelay: 1000,
+    reconnectionDelayMax: 5000,
+  });
+
+  const errorCount = { count: 0 };
+
+  // User-registered event callbacks
+  const callbacks = {};
+
+  function emit(event, data) {
+    if (callbacks[event]) {
+      callbacks[event].forEach((cb) => {
+        try { cb(data); } catch (e) { console.error(`Error in ${event} callback:`, e.message); }
+      });
+    }
+  }
+
+  const heartbeatInterval = setInterval(() => {
+    if (socket.connected) {
+      socket.emit('ping');
+    }
+  }, 30000);
+
+  socket.on('connect', () => {
+    socket.emit('join_public_selective', { stores: [..._requestedStores] });
+    errorCount.count = 0;
+    emit('connect', null);
+  });
+
+  socket.on('connect_error', (err) => {
+    console.log('Socket connect error:', err.message);
+    errorCount.count += 1;
+    if (errorCount.count >= 3) {
+      for (const store of _requestedStores) {
+        if (_storeResetMap[store]) { _storeResetMap[store](); }
+      }
+    }
+    emit('connect_error', err);
+  });
+
+  socket.on('disconnect', (reason) => {
+    console.log('Disconnected from Socket.IO server:', reason);
+    clearInterval(heartbeatInterval);
+    for (const store of _requestedStores) {
+      if (_storeResetMap[store]) { _storeResetMap[store](); }
+    }
+    emit('disconnect', reason);
+  });
+
+  socket.io.on('reconnect_attempt', (attempt) => {
+    console.log(`Reconnect attempt #${attempt}`);
+    emit('reconnect_attempt', attempt);
+  });
+
+  socket.io.on('reconnect', () => {
+    emit('reconnect', null);
+  });
+
+  socket.io.on('reconnect_error', (err) => {
+    console.log('Reconnect error:', err.message);
+    errorCount.count += 1;
+    if (errorCount.count >= 3) {
+      for (const store of _requestedStores) {
+        if (_storeResetMap[store]) { _storeResetMap[store](); }
+      }
+    }
+    emit('reconnect_error', err);
+  });
+
+  socket.on('error', (err) => {
+    console.log('Socket error:', err.message);
+    emit('error', err);
+  });
+
+  // ---- Public room events (shared handler) ----
+  _registerPublicHandlers(socket, emit);
+
+  socket.on('pong', () => {
+    emit('pong', null);
+  });
+
+  // ---- Convenience methods ----
+
+  function on(event, callback) {
+    if (!callbacks[event]) {
+      callbacks[event] = [];
+    }
+    callbacks[event].push(callback);
+  }
+
+  function off(event, callback) {
+    if (!callbacks[event]) { return; }
+    if (callback) {
+      callbacks[event] = callbacks[event].filter((cb) => cb !== callback);
+    } else {
+      delete callbacks[event];
+    }
+  }
+
+  function requestStores(additionalStores) {
+    for (const store of additionalStores) {
+      _requestedStores.add(store);
+    }
+    socket.emit('request_stores', { stores: additionalStores });
+  }
+
+  function joinCandlesticks(pair, timeframe) {
+    socket.emit('join_candlesticks', { pair, timeframe });
+  }
+
+  function leaveCandlesticks(pair, timeframe) {
+    socket.emit('leave_candlesticks', { pair, timeframe });
+  }
+
+  return {
+    socket,
+    on,
+    off,
+    requestStores,
+    joinCandlesticks,
+    leaveCandlesticks,
   };
 }

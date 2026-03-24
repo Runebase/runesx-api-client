@@ -1,5 +1,5 @@
 // src/index.mjs
-import { setupSocket } from './socket.mjs';
+import { setupSocket, setupPublicSocket } from './socket.mjs';
 import { createApi } from './api.mjs';
 import { createConfig } from './config.mjs';
 import { getPools, getPool } from './store/poolStore.mjs';
@@ -10,7 +10,7 @@ import { getUserShares, getUserShareByPoolId } from './store/userSharesStore.mjs
 import { getAllOrderBooks, getOrderBook, getOrderBookPairs, getUserOrders } from './store/orderbookStore.mjs';
 import { getMarkets, getMarketByCoinKey, getMarketByCoins } from './store/marketStore.mjs';
 import { getClobFees } from './store/exchangeConfigStore.mjs';
-import { waitForStores } from './waitForStores.mjs';
+import { waitForStores, waitForSelectiveStores } from './waitForStores.mjs';
 import { estimateLiquidityFrontend, checkRunesLiquidityFrontend, calculateShareAmounts, estimateDepositShares } from './utils/liquidityUtils.mjs';
 import { estimateSwap } from './utils/swapUtils.mjs';
 import { createPriceUtils } from './utils/priceUtils.mjs';
@@ -31,6 +31,13 @@ export function createRunesXClient(options = {}) {
     return { pools, coins, chains, wallets, userShares, orderbooks };
   }
 
+  async function initializePublic({ stores = ['pools', 'coins'] } = {}) {
+    socketHandler = setupPublicSocket(config, stores);
+    const storeData = await waitForSelectiveStores(socketHandler.socket, stores);
+    initialized = true;
+    return storeData;
+  }
+
   function ensureInitialized() {
     if (!initialized) {
       throw new Error('Client not initialized. Call initialize() first.');
@@ -39,6 +46,13 @@ export function createRunesXClient(options = {}) {
 
   return {
     initialize,
+    initializePublic,
+
+    requestStores: (additionalStores) => {
+      ensureInitialized();
+      socketHandler.requestStores(additionalStores);
+      return waitForSelectiveStores(socketHandler.socket, additionalStores);
+    },
 
     // Raw socket access
     getSocket: () => {
@@ -75,13 +89,13 @@ export function createRunesXClient(options = {}) {
     },
 
     // ---- Socket emit convenience methods ----
-    joinCandlesticks: (poolId, timeframe) => {
+    joinCandlesticks: (pair, timeframe) => {
       ensureInitialized();
-      socketHandler.joinCandlesticks(poolId, timeframe);
+      socketHandler.joinCandlesticks(pair, timeframe);
     },
-    leaveCandlesticks: (poolId, timeframe) => {
+    leaveCandlesticks: (pair, timeframe) => {
       ensureInitialized();
-      socketHandler.leaveCandlesticks(poolId, timeframe);
+      socketHandler.leaveCandlesticks(pair, timeframe);
     },
     sendYardMessage: (text) => {
       ensureInitialized();

@@ -4,6 +4,7 @@ import { chainStore, getChains } from './store/chainStore.mjs';
 import { walletStore, getWallets } from './store/walletStore.mjs';
 import { userSharesStore, getUserShares } from './store/userSharesStore.mjs';
 import { orderbookStore, getAllOrderBooks } from './store/orderbookStore.mjs';
+import { getMarkets } from './store/marketStore.mjs';
 
 export function waitForStores(socket) {
   // Function to wait for poolStore to be populated
@@ -224,4 +225,84 @@ export function waitForStores(socket) {
       userShares,
       orderbooks,
     }));
+}
+
+// ---- Selective store waiting (for public-only initialization) ----
+
+const _storeDefinitions = {
+  pools: {
+    waitEvent: 'pools_updated',
+    checkReady: () => poolStore.isInitialReceived,
+    getData: getPools,
+  },
+  coins: {
+    waitEvent: 'coins_updated',
+    checkReady: () => coinStore.isInitialReceived,
+    getData: getCoins,
+  },
+  chains: {
+    waitEvent: 'chains_updated',
+    checkReady: () => chainStore.isInitialReceived,
+    getData: getChains,
+  },
+  orderbooks: {
+    waitEvent: 'orderbooks_initial',
+    checkReady: () => orderbookStore.isInitialReceived,
+    getData: getAllOrderBooks,
+  },
+  markets: {
+    waitEvent: 'markets_initial',
+    checkReady: () => true, // fire-and-forget, resolve immediately
+    getData: getMarkets,
+  },
+};
+
+export function waitForSelectiveStores(socket, requestedStores) {
+  const promises = [];
+
+  for (const storeName of requestedStores) {
+    const def = _storeDefinitions[storeName];
+    if (!def) {
+      // Stores not in the map (buckets, operations, messages, status) are silently skipped
+      continue;
+    }
+
+    const promise = new Promise((resolve, reject) => {
+      if (def.checkReady()) {
+        resolve({ [storeName]: def.getData() });
+        return;
+      }
+
+      const timeout = setTimeout(() => {
+        reject(new Error(`Timeout waiting for initial ${storeName} data`));
+      }, 30000);
+
+      const handler = (data) => {
+        const isInitial = data && data.isInitial;
+        if (isInitial) {
+          clearTimeout(timeout);
+          socket.off(def.waitEvent, handler);
+          resolve({ [storeName]: def.getData() });
+        }
+      };
+
+      socket.on(def.waitEvent, handler);
+
+      socket.on('connect_error', () => {
+        clearTimeout(timeout);
+        reject(new Error(`Socket connection failed while waiting for ${storeName}`));
+      });
+
+      socket.on('disconnect', () => {
+        clearTimeout(timeout);
+        reject(new Error(`Socket disconnected before receiving initial ${storeName} data`));
+      });
+    });
+
+    promises.push(promise);
+  }
+
+  return Promise.all(promises).then((results) => {
+    return Object.assign({}, ...results);
+  });
 }
